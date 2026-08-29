@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Voda Time Tracker</title>
+<link rel="icon" href="data:,">
+<style>
+:root{
+  --navy:#0A1F3D; --navy-light:#14335F; --cyan:#00B4D8; --cyan-dark:#0090AD;
+  --ink:#10202E; --muted:#647184; --line:#E1E7EC; --green:#2E9E6B; --green-bg:#E7F5EE;
+  --blue:#2E7FD6; --blue-bg:#E9F1FC; --amber:#C98A18; --amber-bg:#FDF3E3;
+  --red:#D6455B; --red-bg:#FBE7EA; --gray-bg:#EEF0F2; --card:#FFFFFF; --bg:#F5F7F9;
+}
+[data-theme="dark"]{
+  --ink:#EAF0F6; --muted:#8B9AAD; --line:#243244; --gray-bg:#1B2635; --card:#182233; --bg:#0B1420;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--ink);}
+.app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);padding-bottom:24px;}
+header.top{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;background:var(--navy);color:#fff;}
+header.top .brand{display:flex;align-items:center;gap:10px;}
+header.top .brand img{width:32px;height:32px;}
+header.top .brand .t{font-weight:800;font-size:16px;}
+header.top .brand .s{font-size:11px;color:#9FB4CC;}
+.icon-btn{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.12);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+main{padding:18px;}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:14px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:6px;}
+.field input,.field select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;text-align:center;}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-cyan{background:var(--cyan);color:var(--navy);}
+.btn-green{background:var(--green);color:#fff;}
+.btn-amber{background:var(--amber);color:#fff;}
+.btn-ghost{background:var(--gray-bg);color:var(--ink);}
+.btn-row{display:flex;flex-direction:column;gap:10px;margin-top:6px;}
+.hint{font-size:12px;color:var(--muted);background:var(--gray-bg);border-radius:8px;padding:9px 11px;margin-top:8px;line-height:1.4;}
+.center{text-align:center;}
+.big-timer{font-size:44px;font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums;text-align:center;margin:6px 0;}
+[data-theme="dark"] .big-timer{color:var(--cyan);}
+.status-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:5px 12px;border-radius:100px;margin:0 auto 12px;}
+.status-pill.pretrip{background:var(--blue-bg);color:var(--blue);}
+.status-pill.job{background:var(--green-bg);color:var(--green);}
+.status-pill.posttrip{background:var(--amber-bg);color:var(--amber);}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+.job-name{font-size:19px;font-weight:800;text-align:center;color:var(--ink);margin-bottom:2px;}
+.employee-name{font-size:13px;color:var(--muted);text-align:center;margin-bottom:18px;}
+.seg{display:flex;background:var(--gray-bg);border-radius:12px;padding:3px;margin-bottom:16px;}
+.seg button{flex:1;border:none;background:transparent;padding:10px 8px;border-radius:9px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;}
+.seg button.active{background:var(--card);color:var(--navy);box-shadow:0 1px 3px rgba(0,0,0,0.12);}
+[data-theme="dark"] .seg button.active{background:var(--card);color:var(--ink);}
+table.data{width:100%;border-collapse:collapse;font-size:13px;}
+table.data th{text-align:left;padding:8px 10px;background:var(--navy);color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;}
+table.data td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;}
+table.data tfoot td{font-weight:800;background:var(--gray-bg);}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:16px;}
+.tab-row{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;}
+.tab-row button{flex-shrink:0;padding:8px 14px;border-radius:100px;border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:12.5px;font-weight:700;cursor:pointer;}
+.tab-row button.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+.emp-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line);}
+.emp-row:last-child{border-bottom:none;}
+.emp-row .nm{font-weight:700;font-size:14px;}
+.emp-row .rt{font-size:12px;color:var(--muted);}
+.stat-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.stat-card{flex:1 1 auto;min-width:100px;background:var(--gray-bg);border-radius:12px;padding:12px;text-align:center;}
+.stat-card .n{font-size:22px;font-weight:800;color:var(--navy);}
+[data-theme="dark"] .stat-card .n{color:var(--cyan);}
+.stat-card .l{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-top:2px;}
+.overlay{position:fixed;inset:0;background:rgba(10,20,30,0.55);z-index:100;display:none;align-items:flex-end;justify-content:center;}
+.overlay.active{display:flex;}
+.sheet{background:var(--card);width:100%;max-width:520px;border-radius:20px 20px 0 0;max-height:88vh;overflow-y:auto;padding:6px 18px 24px;animation:slideup 0.2s ease-out;}
+@keyframes slideup{from{transform:translateY(30px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.sheet-handle{width:40px;height:4px;background:var(--line);border-radius:4px;margin:10px auto 14px;}
+.sheet-title{font-size:17px;font-weight:800;}
+.close-x{width:30px;height:30px;border-radius:50%;background:var(--gray-bg);border:none;display:flex;align-items:center;justify-content:center;flex-shrink:0;float:right;cursor:pointer;}
+.section-title{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin:18px 0 8px;}
+.empty{padding:30px 10px;text-align:center;color:var(--muted);font-size:13px;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:11px 20px;border-radius:100px;font-size:13.5px;font-weight:600;z-index:300;opacity:0;transition:opacity .2s;pointer-events:none;max-width:88vw;text-align:center;}
+.toast.show{opacity:1;}
+svg{display:block;}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div class="toast" id="toast"></div>
+
+<!-- Admin unlock -->
+<div class="overlay" id="modalAdminLogin"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head"><button class="close-x" onclick="closeModal('modalAdminLogin')">&times;</button></div>
+  <div class="sheet-title" style="margin-bottom:14px;">Admin access</div>
+  <div class="field"><label>Admin password</label><input type="password" id="adminPassInput" placeholder="••••••••"></div>
+  <button class="btn btn-primary" onclick="tryAdminLogin()">Unlock</button>
+</div></div>
+
+<!-- Job picker -->
+<div class="overlay" id="modalJobPicker"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head"><button class="close-x" onclick="closeModal('modalJobPicker')">&times;</button></div>
+  <div class="sheet-title" style="margin-bottom:6px;" id="jobPickerTitle">Pick a job</div>
+  <div class="hint" style="margin-top:0;margin-bottom:12px;">Pulled live from Job Tracker's Active jobs.</div>
+  <input id="jobFilterInput" placeholder="Filter jobs..." style="margin-bottom:10px;" oninput="renderJobPickerList(this.value)">
+  <div id="jobPickerList"></div>
+</div></div>
+
+<!-- Add / edit employee -->
+<div class="overlay" id="modalEmployee"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head"><button class="close-x" onclick="closeModal('modalEmployee')">&times;</button></div>
+  <div class="sheet-title" style="margin-bottom:14px;" id="empModalTitle">Add employee</div>
+  <div class="field"><label>Name</label><input id="empNameInput" placeholder="e.g. Arturo Hoyos"></div>
+  <div class="field"><label>Hourly rate ($)</label><input id="empRateInput" type="number" step="0.01" placeholder="e.g. 22.00"></div>
+  <div class="field"><label>PIN (4 digits, employee uses this to clock in)</label><input id="empPinInput" placeholder="e.g. 4471" maxlength="4" inputmode="numeric"></div>
+  <button class="btn btn-primary" onclick="confirmSaveEmployee()">Save</button>
+</div></div>
+
+<!-- Edit a time entry (spot-check correction) -->
+<div class="overlay" id="modalEditEntry"><div class="sheet" style="max-height:92vh;">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head"><button class="close-x" onclick="closeModal('modalEditEntry')">&times;</button></div>
+  <div class="sheet-title" style="margin-bottom:6px;">Edit time entry</div>
+  <div class="hint" style="margin-top:0;" id="editEntrySub">—</div>
+  <div id="editEntrySegments" style="margin-top:14px;"></div>
+  <div class="btn-row">
+    <button class="btn btn-ghost" onclick="closeModal('modalEditEntry')">Done</button>
+  </div>
+</div></div>
+
+<script>
+/* ============ CONFIG ============ */
+const CONFIG = {
+  API_URL: "REPLACE_WITH_YOUR_TIMETRACKER_APPS_SCRIPT_URL"
+};
+const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !== 0;
+// Read-only link to Job Tracker's own backend, purely to list Active jobs —
+// Time Tracker never writes here. The reverse sync (pulling finished time
+// entries INTO a job's Labor Cost log) happens from the Job Tracker side,
+// not here — see the notes we discussed on why that direction is safer.
+const JOBTRACKER_API_URL = "https://script.google.com/macros/s/AKfycbxIOIYM6L4MNXAJF79axSqgCcrl2UTcNnuMKOf27C5aXphlNExTOIfQIGpbU6B-kpDt9A/exec";
+const ADMIN_PASSWORD = "voda2026"; // change this — simple gate, not meant to be high-security
+const REFRESH_INTERVAL_MS = 20000;
+
+/* ============ STATE ============ */
+let employees = [];
+let entries = [];
+let importLog = [];
+let jobTrackerJobs = [];
+let currentEmployee = null;   // {id, name, hourlyRate}
+let currentEntry = null;      // today's in-progress entry for currentEmployee
+let isAdmin = false;
+let adminTab = 'today';
+let timerInterval = null;
+let jobPickerMode = 'start'; // 'start' | 'switch'
+
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function uid(prefix){ return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7); }
+function nowIso(){ return new Date().toISOString(); }
+function fmtTime(iso){ if(!iso) return '—'; return new Date(iso).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); }
+function fmtDate(s){ if(!s) return '—'; const d=new Date(s+'T00:00:00'); return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function fmtHours(h){ return (Math.round((h||0)*100)/100).toFixed(2); }
+function fmtMoney(n){ n=Number(n)||0; return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(window._toastT);
+  window._toastT = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function openModal(id){ document.getElementById(id).classList.add('active'); }
+function closeModal(id){ document.getElementById(id).classList.remove('active'); }
+function initTheme(){
+  const saved = localStorage.getItem('vtt-theme');
+  if(saved==='dark') document.documentElement.setAttribute('data-theme','dark');
+}
+function toggleTheme(){
+  const isDark = document.documentElement.getAttribute('data-theme')==='dark';
+  if(isDark){ document.documentElement.removeAttribute('data-theme'); localStorage.setItem('vtt-theme','light'); }
+  else{ document.documentElement.setAttribute('data-theme','dark'); localStorage.setItem('vtt-theme','dark'); }
+  render();
+}
+
+/* ============ BACKEND I/O ============ */
+async function apiGetAll(){
+  const res = await fetch(`${CONFIG.API_URL}?action=getAll`);
+  return res.json();
+}
+async function apiPost(action, data){
+  await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify({ action, data }) });
+}
+async function saveEmployeesRemote(){ try{ await apiPost('saveEmployees', employees); }catch(e){ console.error('save employees failed', e); } }
+async function saveEntriesRemote(){ try{ await apiPost('saveEntries', entries); }catch(e){ console.error('save entries failed', e); } }
+async function saveImportLogRemote(){ try{ await apiPost('saveImportLog', importLog); }catch(e){ console.error('save import log failed', e); } }
+
+async function loadData(silent){
+  if(!BACKEND_READY){ renderSetupScreen(); return; }
+  try{
+    const data = await apiGetAll();
+    employees = data.employees || [];
+    entries = data.entries || [];
+    importLog = data.importLog || [];
+    if(currentEmployee){
+      const fresh = employees.find(e=>e.id===currentEmployee.id);
+      if(fresh) currentEmployee = fresh;
+      currentEntry = entries.find(en=>en.employeeId===currentEmployee.id && en.status==='active') || null;
+    }
+    render();
+  }catch(e){
+    console.error('load failed', e);
+    if(!silent) showToast("Couldn't reach the server — check your connection");
+  }
+}
+async function loadJobTrackerJobs(){
+  try{
+    const res = await fetch(`${JOBTRACKER_API_URL}?action=getAll`);
+    const data = await res.json();
+    const jobs = data.jobs || [];
+    const list = [];
+    jobs.forEach(j=>{
+      if(j.completed || j.archived) return;
+      ['mitigation','reconstruction'].forEach(k=>{
+        const sc = j.scopes && j.scopes[k];
+        if(!sc || !sc.active) return;
+        if(sc.probability===100){
+          list.push({ jobId: j.id, jobName: j.customerName, jobType: k==='mitigation'?'Mitigation':'Reconstruction' });
+        }
+      });
+    });
+    jobTrackerJobs = list;
+  }catch(e){
+    console.error('Job Tracker fetch failed', e);
+    jobTrackerJobs = [];
+  }
+}
+
+/* ============ RENDER: SHELL ============ */
+function render(){
+  if(!currentEmployee && !isAdmin){ renderRolePicker(); return; }
+  if(isAdmin){ renderAdmin(); return; }
+  renderTechFlow();
+}
+function renderSetupScreen(){
+  document.getElementById('app').innerHTML = `
+    <header class="top"><div class="brand"><div class="t">Voda Time Tracker</div></div></header>
+    <main><div class="card center">
+      <div style="font-weight:700;margin-bottom:8px;">Backend not connected yet</div>
+      <div class="hint" style="margin-top:0;">Set CONFIG.API_URL in the code to your Time Tracker Apps Script URL.</div>
+    </div></main>`;
+}
+
+/* ============ ROLE PICKER ============ */
+function renderRolePicker(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <header class="top">
+      <div class="brand"><div><div class="t">Voda Time Tracker</div><div class="s">Cleaning &amp; Restoration &middot; Tucson</div></div></div>
+      <button class="icon-btn" onclick="toggleTheme()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
+    </header>
+    <main>
+      <div class="card center">
+        <div style="font-size:17px;font-weight:800;margin-bottom:4px;">Who's clocking in?</div>
+        <div class="hint" style="margin-top:0;margin-bottom:16px;">Pick your name and enter your PIN.</div>
+        <div class="field" style="text-align:left;">
+          <label>Your name</label>
+          <select id="empSelect">${employees.filter(e=>e.active!==false).map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('') || '<option value="">No employees set up yet</option>'}</select>
+        </div>
+        <div class="field" style="text-align:left;">
+          <label>PIN</label>
+          <input id="pinInput" type="password" inputmode="numeric" maxlength="4" placeholder="••••">
+        </div>
+        <button class="btn btn-cyan" onclick="techLogin()">Continue</button>
+      </div>
+      <div class="card center">
+        <div style="font-weight:700;margin-bottom:10px;">Admin</div>
+        <button class="btn btn-ghost" onclick="openModal('modalAdminLogin')">Open admin dashboard</button>
+      </div>
+    </main>`;
+}
+function techLogin(){
+  const id = document.getElementById('empSelect').value;
+  const pin = document.getElementById('pinInput').value.trim();
+  const emp = employees.find(e=>e.id===id);
+  if(!emp){ showToast('Select your name'); return; }
+  if(String(emp.pin||'') !== pin){ showToast('Wrong PIN'); return; }
+  currentEmployee = emp;
+  currentEntry = entries.find(en=>en.employeeId===emp.id && en.status==='active') || null;
+  loadJobTrackerJobs().then(render);
+  render();
+}
+function tryAdminLogin(){
+  const val = document.getElementById('adminPassInput').value;
+  if(val !== ADMIN_PASSWORD){ showToast('Wrong password'); return; }
+  isAdmin = true;
+  closeModal('modalAdminLogin');
+  render();
+}
+function signOut(){
+  currentEmployee = null; currentEntry = null; isAdmin = false;
+  render();
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ============ TECH FLOW ============ */
+function currentPhase(){
+  if(!currentEntry) return 'clockedOut';
+  const segs = currentEntry.segments;
+  const last = segs[segs.length-1];
+  if(!last) return 'clockedOut';
+  if(!last.end) return last.type; // 'pretrip' | 'job' | 'posttrip' — the one still running
+  if(last.type==='posttrip') return 'readyToClockOut';
+  return 'pickingJob';
+}
+function elapsedLabel(startIso){
+  const ms = Date.now() - new Date(startIso).getTime();
+  const totalSec = Math.max(0, Math.floor(ms/1000));
+  const h = Math.floor(totalSec/3600), m = Math.floor((totalSec%3600)/60), s = totalSec%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function renderTechFlow(){
+  clearInterval(timerInterval);
+  const app = document.getElementById('app');
+  const phase = currentPhase();
+
+  app.innerHTML = `
+    <header class="top">
+      <div class="brand"><div><div class="t">Voda Time Tracker</div><div class="s">${escapeHtml(currentEmployee.name)}</div></div></div>
+      <button class="icon-btn" onclick="signOut()" title="Switch user"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+    </header>
+    <main id="techMain"></main>`;
+
+  const main = document.getElementById('techMain');
+
+  if(phase==='clockedOut'){
+    main.innerHTML = `
+      <div class="card center" style="padding-top:36px;padding-bottom:36px;">
+        <div style="font-size:15px;color:var(--muted);margin-bottom:18px;">Ready when you are.</div>
+        <button class="btn btn-green" style="font-size:17px;padding:18px;" onclick="clockIn()">Clock In</button>
+      </div>
+      <div class="hint">Clocking in starts your pre-trip time automatically \u2014 pick a job once you're ready to head out.</div>`;
+    return;
+  }
+
+  if(phase==='pretrip'){
+    const seg = currentEntry.segments[currentEntry.segments.length-1];
+    main.innerHTML = `
+      <div class="card center">
+        <div class="status-pill pretrip"><span class="dot"></span>PRE-TRIP</div>
+        <div class="job-name">Vehicle check</div>
+        <div class="employee-name">Started ${fmtTime(seg.start)}</div>
+        <div class="big-timer" id="liveTimer">00:00:00</div>
+        <div class="btn-row">
+          <button class="btn btn-cyan" onclick="finishPretrip()">Done \u2014 pick a job</button>
+        </div>
+      </div>`;
+    startTimer(seg.start);
+    return;
+  }
+
+  if(phase==='pickingJob'){
+    main.innerHTML = `
+      <div class="card center">
+        <div style="font-weight:700;margin-bottom:14px;">Pre-trip logged. What job are you headed to?</div>
+        <button class="btn btn-cyan" onclick="openJobPicker('start')">Pick a job</button>
+      </div>`;
+    return;
+  }
+
+  if(phase==='job'){
+    const seg = currentEntry.segments[currentEntry.segments.length-1];
+    main.innerHTML = `
+      <div class="card center">
+        <div class="status-pill job"><span class="dot"></span>WORKING</div>
+        <div class="job-name">${escapeHtml(seg.jobName)}</div>
+        <div class="employee-name">${seg.jobType} &middot; started ${fmtTime(seg.start)}</div>
+        <div class="big-timer" id="liveTimer">00:00:00</div>
+        <div class="btn-row">
+          <button class="btn btn-cyan" onclick="openJobPicker('switch')">Switch to another job</button>
+          <button class="btn btn-amber" onclick="headBackToShop()">Head back to shop</button>
+        </div>
+      </div>`;
+    startTimer(seg.start);
+    return;
+  }
+
+  if(phase==='posttrip'){
+    const seg = currentEntry.segments[currentEntry.segments.length-1];
+    main.innerHTML = `
+      <div class="card center">
+        <div class="status-pill posttrip"><span class="dot"></span>POST-TRIP</div>
+        <div class="job-name">Wrapping up</div>
+        <div class="employee-name">Started ${fmtTime(seg.start)}</div>
+        <div class="big-timer" id="liveTimer">00:00:00</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="clockOut()">Clock Out</button>
+        </div>
+      </div>`;
+    startTimer(seg.start);
+    return;
+  }
+}
+function startTimer(startIso){
+  const el = document.getElementById('liveTimer');
+  if(!el) return;
+  el.textContent = elapsedLabel(startIso);
+  timerInterval = setInterval(()=>{
+    const el2 = document.getElementById('liveTimer');
+    if(!el2){ clearInterval(timerInterval); return; }
+    el2.textContent = elapsedLabel(startIso);
+  }, 1000);
+}
+
+function closeLastSegment(){
+  const seg = currentEntry.segments[currentEntry.segments.length-1];
+  if(!seg || seg.end) return;
+  seg.end = nowIso();
+  const hrs = (new Date(seg.end) - new Date(seg.start)) / 3600000;
+  seg.hours = Math.round(hrs*10000)/10000;
+  seg.cost = Math.round(seg.hours * (currentEmployee.hourlyRate||0) * 100)/100;
+}
+function recalcTotals(){
+  let hrs=0, cost=0;
+  currentEntry.segments.forEach(s=>{ hrs += s.hours||0; cost += s.cost||0; });
+  currentEntry.totalHours = Math.round(hrs*100)/100;
+  currentEntry.totalCost = Math.round(cost*100)/100;
+}
+async function persistEntry(){
+  const idx = entries.findIndex(e=>e.id===currentEntry.id);
+  if(idx>=0) entries[idx] = currentEntry; else entries.push(currentEntry);
+  await saveEntriesRemote();
+}
+
+function clockIn(){
+  currentEntry = {
+    id: uid('TE'), employeeId: currentEmployee.id, employeeName: currentEmployee.name,
+    date: todayStr(), clockIn: nowIso(), clockOut: '',
+    segments: [{ type:'pretrip', jobId:'', jobName:'', jobType:'', start: nowIso(), end:'', hours:0, cost:0 }],
+    preTrip:true, postTrip:false, totalHours:0, totalCost:0, status:'active', notes:''
+  };
+  persistEntry();
+  render();
+}
+function finishPretrip(){
+  closeLastSegment();
+  recalcTotals();
+  persistEntry();
+  render();
+}
+function openJobPicker(mode){
+  jobPickerMode = mode;
+  document.getElementById('jobPickerTitle').textContent = mode==='switch' ? 'Switch to a job' : 'Pick a job';
+  document.getElementById('jobFilterInput').value = '';
+  renderJobPickerList('');
+  openModal('modalJobPicker');
+  loadJobTrackerJobs().then(()=>renderJobPickerList(document.getElementById('jobFilterInput').value));
+}
+function renderJobPickerList(filter){
+  filter = (filter||'').toLowerCase();
+  const wrap = document.getElementById('jobPickerList');
+  const options = jobTrackerJobs.filter(j=>j.jobName.toLowerCase().includes(filter));
+  let html = '';
+  if(options.length===0){
+    html += `<div class="empty">No active jobs found${filter? ' matching that filter':''}.</div>`;
+  } else {
+    html += options.map(j=>`
+      <div class="emp-row" style="cursor:pointer;" onclick="pickJob('${j.jobId}','${j.jobType}')">
+        <div><div class="nm">${escapeHtml(j.jobName)}</div><div class="rt">${j.jobType}</div></div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>`).join('');
+  }
+  html += `<div class="emp-row" style="cursor:pointer;" onclick="pickJob('','Shop')">
+    <div><div class="nm">Shop / General</div><div class="rt">Not tied to a specific customer job</div></div>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+  </div>`;
+  wrap.innerHTML = html;
+}
+function pickJob(jobId, jobType){
+  const found = jobTrackerJobs.find(j=>j.jobId===jobId && j.jobType===jobType);
+  const jobName = found ? found.jobName : (jobType==='Shop' ? 'Shop / General' : 'Unknown job');
+  if(jobPickerMode==='switch') closeLastSegment();
+  currentEntry.segments.push({ type:'job', jobId, jobName, jobType, start: nowIso(), end:'', hours:0, cost:0 });
+  recalcTotals();
+  persistEntry();
+  closeModal('modalJobPicker');
+  render();
+}
+function headBackToShop(){
+  closeLastSegment();
+  currentEntry.segments.push({ type:'posttrip', jobId:'', jobName:'', jobType:'', start: nowIso(), end:'', hours:0, cost:0 });
+  recalcTotals();
+  persistEntry();
+  render();
+}
+async function clockOut(){
+  closeLastSegment();
+  recalcTotals();
+  currentEntry.clockOut = nowIso();
+  currentEntry.status = 'complete';
+  await persistEntry();
+  showToast(`Clocked out \u2014 ${fmtHours(currentEntry.totalHours)} hours logged`);
+  currentEntry = null;
+  render();
+}
+
+/* ============ ADMIN ============ */
+function renderAdmin(){
+  clearInterval(timerInterval);
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <header class="top">
+      <div class="brand"><div><div class="t">Voda Time Tracker</div><div class="s">Admin</div></div></div>
+      <button class="icon-btn" onclick="signOut()" title="Sign out"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+    </header>
+    <main>
+      <div class="tab-row">
+        <button class="${adminTab==='today'?'active':''}" onclick="setAdminTab('today')">Today</button>
+        <button class="${adminTab==='employees'?'active':''}" onclick="setAdminTab('employees')">Employees</button>
+        <button class="${adminTab==='entries'?'active':''}" onclick="setAdminTab('entries')">All Entries</button>
+        <button class="${adminTab==='reports'?'active':''}" onclick="setAdminTab('reports')">Reports</button>
+      </div>
+      <div id="adminBody"></div>
+    </main>`;
+  renderAdminBody();
+}
+function setAdminTab(t){ adminTab=t; renderAdminBody(); }
+function renderAdminBody(){
+  const wrap = document.getElementById('adminBody');
+  if(adminTab==='today') wrap.innerHTML = adminTodayHtml();
+  else if(adminTab==='employees') wrap.innerHTML = adminEmployeesHtml();
+  else if(adminTab==='entries') wrap.innerHTML = adminEntriesHtml();
+  else if(adminTab==='reports') wrap.innerHTML = adminReportsHtml();
+}
+
+function adminTodayHtml(){
+  const today = todayStr();
+  const todays = entries.filter(e=>e.date===today);
+  const activeCount = todays.filter(e=>e.status==='active').length;
+  const doneCount = todays.filter(e=>e.status==='complete').length;
+  const totalHrs = todays.reduce((s,e)=>s+(e.totalHours||0),0);
+  let html = `<div class="stat-row">
+    <div class="stat-card"><div class="n">${activeCount}</div><div class="l">Clocked in now</div></div>
+    <div class="stat-card"><div class="n">${doneCount}</div><div class="l">Finished today</div></div>
+    <div class="stat-card"><div class="n">${fmtHours(totalHrs)}</div><div class="l">Hours today</div></div>
+  </div>`;
+  if(todays.length===0){ html += `<div class="card empty">No time logged yet today.</div>`; return html; }
+  html += `<div class="card">` + todays.map(e=>{
+    const lastSeg = e.segments[e.segments.length-1];
+    const whereNow = e.status==='active' ? (lastSeg.type==='job'? 'Working: '+escapeHtml(lastSeg.jobName) : lastSeg.type==='pretrip'?'Pre-trip':'Post-trip') : 'Clocked out';
+    return `<div class="emp-row" style="cursor:pointer;" onclick="openEditEntry('${e.id}')">
+      <div><div class="nm">${escapeHtml(e.employeeName)}</div><div class="rt">${whereNow} &middot; in ${fmtTime(e.clockIn)}${e.clockOut? ' &middot; out '+fmtTime(e.clockOut):''}</div></div>
+      <div style="font-weight:800;">${fmtHours(e.totalHours)}h</div>
+    </div>`;
+  }).join('') + `</div>`;
+  return html;
+}
+
+function adminEmployeesHtml(){
+  let html = `<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <div style="font-weight:800;">Employees</div>
+      <button class="btn btn-cyan" style="width:auto;padding:8px 14px;font-size:13px;" onclick="openAddEmployee()">+ Add</button>
+    </div>`;
+  if(employees.length===0){ html += `<div class="empty">No employees yet.</div>`; }
+  else {
+    html += employees.map(e=>`
+      <div class="emp-row">
+        <div><div class="nm">${escapeHtml(e.name)}${e.active===false?' <span style="color:var(--muted);font-weight:400;">(inactive)</span>':''}</div><div class="rt">${fmtMoney(e.hourlyRate)}/hr</div></div>
+        <div style="display:flex;gap:14px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;" onclick="openEditEmployee('${e.id}')"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;" onclick="toggleEmployeeActive('${e.id}')">${e.active===false? '<polyline points="20 6 9 17 4 12"/>' : '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'}</svg>
+        </div>
+      </div>`).join('');
+  }
+  html += `</div>`;
+  return html;
+}
+let editingEmployeeId = null;
+function openAddEmployee(){
+  editingEmployeeId = null;
+  document.getElementById('empModalTitle').textContent = 'Add employee';
+  document.getElementById('empNameInput').value = '';
+  document.getElementById('empRateInput').value = '';
+  document.getElementById('empPinInput').value = '';
+  openModal('modalEmployee');
+}
+function openEditEmployee(id){
+  const e = employees.find(x=>x.id===id);
+  if(!e) return;
+  editingEmployeeId = id;
+  document.getElementById('empModalTitle').textContent = 'Edit employee';
+  document.getElementById('empNameInput').value = e.name;
+  document.getElementById('empRateInput').value = e.hourlyRate;
+  document.getElementById('empPinInput').value = e.pin||'';
+  openModal('modalEmployee');
+}
+async function confirmSaveEmployee(){
+  const name = document.getElementById('empNameInput').value.trim();
+  const rate = parseFloat(document.getElementById('empRateInput').value)||0;
+  const pin = document.getElementById('empPinInput').value.trim();
+  if(!name){ showToast('Enter a name'); return; }
+  if(!/^\d{4}$/.test(pin)){ showToast('PIN must be exactly 4 digits'); return; }
+  if(editingEmployeeId){
+    const e = employees.find(x=>x.id===editingEmployeeId);
+    e.name=name; e.hourlyRate=rate; e.pin=pin;
+  } else {
+    employees.push({ id: uid('EMP'), name, hourlyRate: rate, pin, active: true });
+  }
+  await saveEmployeesRemote();
+  closeModal('modalEmployee');
+  renderAdminBody();
+  showToast('Saved');
+}
+async function toggleEmployeeActive(id){
+  const e = employees.find(x=>x.id===id);
+  e.active = e.active===false ? true : false;
+  await saveEmployeesRemote();
+  renderAdminBody();
+}
+
+function adminEntriesHtml(){
+  const sorted = entries.slice().sort((a,b)=> (b.clockIn||'').localeCompare(a.clockIn||''));
+  let html = `<div class="table-wrap"><table class="data"><thead><tr>
+    <th>Date</th><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Cost</th><th>Status</th>
+  </tr></thead><tbody>`;
+  if(sorted.length===0){ html += `<tr><td colspan="7" style="text-align:center;color:var(--muted);">No entries yet.</td></tr>`; }
+  sorted.forEach(e=>{
+    html += `<tr style="cursor:pointer;" onclick="openEditEntry('${e.id}')">
+      <td>${fmtDate(e.date)}</td><td>${escapeHtml(e.employeeName)}</td>
+      <td>${fmtTime(e.clockIn)}</td><td>${fmtTime(e.clockOut)}</td>
+      <td>${fmtHours(e.totalHours)}</td><td>${fmtMoney(e.totalCost)}</td>
+      <td>${e.status==='active'?'<span style="color:var(--green);font-weight:700;">Active</span>':'Complete'}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>`;
+  return html;
+}
+function openEditEntry(id){
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  document.getElementById('editEntrySub').textContent = `${e.employeeName} \u2014 ${fmtDate(e.date)}`;
+  document.getElementById('editEntrySegments').innerHTML = e.segments.map((s,i)=>`
+    <div class="card" style="padding:14px;margin-bottom:10px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px;text-transform:capitalize;">${s.type}${s.jobName? ' \u2014 '+escapeHtml(s.jobName):''}</div>
+      <div class="field" style="margin-bottom:8px;"><label>Start</label><input type="datetime-local" value="${toLocalInput(s.start)}" onchange="editSegmentTime('${e.id}',${i},'start',this.value)"></div>
+      <div class="field" style="margin-bottom:0;"><label>End</label><input type="datetime-local" value="${toLocalInput(s.end)}" onchange="editSegmentTime('${e.id}',${i},'end',this.value)" ${!s.end?'placeholder="Still running"':''}></div>
+      <div class="hint">${fmtHours(s.hours)} hrs &middot; ${fmtMoney(s.cost)}</div>
+    </div>`).join('');
+  openModal('modalEditEntry');
+}
+function toLocalInput(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  const pad = n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+async function editSegmentTime(entryId, segIdx, field, value){
+  const e = entries.find(x=>x.id===entryId);
+  if(!e || !value) return;
+  const iso = new Date(value).toISOString();
+  e.segments[segIdx][field] = iso;
+  const s = e.segments[segIdx];
+  if(s.start && s.end){
+    const hrs = (new Date(s.end)-new Date(s.start))/3600000;
+    s.hours = Math.round(hrs*10000)/10000;
+    const emp = employees.find(x=>x.id===e.employeeId);
+    s.cost = Math.round(s.hours*(emp?emp.hourlyRate:0)*100)/100;
+  }
+  let hrs=0, cost=0;
+  e.segments.forEach(s2=>{ hrs+=s2.hours||0; cost+=s2.cost||0; });
+  e.totalHours = Math.round(hrs*100)/100;
+  e.totalCost = Math.round(cost*100)/100;
+  await saveEntriesRemote();
+  openEditEntry(entryId);
+  renderAdminBody();
+  showToast('Updated');
+}
+
+/* ---- Reports ---- */
+function weekRangeContaining(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const day = d.getDay();
+  const monday = new Date(d); monday.setDate(d.getDate() - ((day+6)%7));
+  const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
+  const fmt = x=> x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+  return { start: fmt(monday), end: fmt(sunday) };
+}
+function adminReportsHtml(){
+  const today = todayStr();
+  const week = weekRangeContaining(today);
+  const weekEntries = entries.filter(e=>e.date>=week.start && e.date<=week.end);
+
+  // Per-employee weekly hours
+  const byEmp = {};
+  weekEntries.forEach(e=>{
+    if(!byEmp[e.employeeName]) byEmp[e.employeeName] = { hours:0, cost:0, days:new Set() };
+    byEmp[e.employeeName].hours += e.totalHours||0;
+    byEmp[e.employeeName].cost += e.totalCost||0;
+    byEmp[e.employeeName].days.add(e.date);
+  });
+
+  // Per-job breakdown (job-type segments only, across all time — not just this week)
+  const byJob = {};
+  entries.forEach(e=>{
+    e.segments.forEach(s=>{
+      if(s.type!=='job' || !s.jobName) return;
+      const key = s.jobName;
+      if(!byJob[key]) byJob[key] = { hours:0, cost:0, people:new Set() };
+      byJob[key].hours += s.hours||0;
+      byJob[key].cost += s.cost||0;
+      byJob[key].people.add(e.employeeName);
+    });
+  });
+
+  let html = `<div class="section-title" style="margin-top:0;">This week (${fmtDate(week.start)} \u2013 ${fmtDate(week.end)})</div>`;
+  html += `<div class="table-wrap"><table class="data"><thead><tr><th>Employee</th><th>Days</th><th>Hours</th><th>Cost</th></tr></thead><tbody>`;
+  let wkHrs=0, wkCost=0;
+  Object.keys(byEmp).sort().forEach(name=>{
+    const r = byEmp[name]; wkHrs+=r.hours; wkCost+=r.cost;
+    html += `<tr><td>${escapeHtml(name)}</td><td>${r.days.size}</td><td>${fmtHours(r.hours)}</td><td>${fmtMoney(r.cost)}</td></tr>`;
+  });
+  if(Object.keys(byEmp).length===0) html += `<tr><td colspan="4" style="text-align:center;color:var(--muted);">No hours logged this week yet.</td></tr>`;
+  html += `</tbody><tfoot><tr><td colspan="2">Total</td><td>${fmtHours(wkHrs)}</td><td>${fmtMoney(wkCost)}</td></tr></tfoot></table></div>`;
+
+  html += `<div class="section-title">Jobs worked (all time) \u2014 who worked each one</div>`;
+  html += `<div class="table-wrap"><table class="data"><thead><tr><th>Job</th><th>Employees</th><th>Hours</th><th>Labor cost</th></tr></thead><tbody>`;
+  const jobKeys = Object.keys(byJob).sort((a,b)=>byJob[b].hours-byJob[a].hours);
+  jobKeys.forEach(name=>{
+    const r = byJob[name];
+    html += `<tr><td>${escapeHtml(name)}</td><td>${[...r.people].map(escapeHtml).join(', ')}</td><td>${fmtHours(r.hours)}</td><td>${fmtMoney(r.cost)}</td></tr>`;
+  });
+  if(jobKeys.length===0) html += `<tr><td colspan="4" style="text-align:center;color:var(--muted);">No job time logged yet.</td></tr>`;
+  html += `</tbody></table></div>`;
+
+  // Cost analysis: job time vs shop/pretrip/posttrip overhead, all time
+  let jobHrs=0, overheadHrs=0, jobCost=0, overheadCost=0;
+  entries.forEach(e=> e.segments.forEach(s=>{
+    if(s.type==='job' && s.jobId){ jobHrs+=s.hours||0; jobCost+=s.cost||0; }
+    else { overheadHrs+=s.hours||0; overheadCost+=s.cost||0; }
+  }));
+  const totalHrsAll = jobHrs+overheadHrs;
+  const pct = totalHrsAll ? Math.round(jobHrs/totalHrsAll*1000)/10 : 0;
+  html += `<div class="section-title">Cost analysis (all time)</div>
+    <div class="stat-row">
+      <div class="stat-card"><div class="n">${fmtHours(jobHrs)}</div><div class="l">Billable job hours</div></div>
+      <div class="stat-card"><div class="n">${fmtHours(overheadHrs)}</div><div class="l">Pre/post-trip &amp; shop</div></div>
+      <div class="stat-card"><div class="n">${pct}%</div><div class="l">Time on billable work</div></div>
+    </div>
+    <div class="hint">Billable job cost: ${fmtMoney(jobCost)} &middot; Overhead cost: ${fmtMoney(overheadCost)}</div>`;
+
+  return html;
+}
+
+/* ============ INIT ============ */
+initTheme();
+if(BACKEND_READY){
+  document.getElementById('app').innerHTML = `
+    <header class="top"><div class="brand"><div class="t">Voda Time Tracker</div></div></header>
+    <main><div class="card center" style="color:var(--muted);padding:40px 10px;">Loading&hellip;</div></main>`;
+  loadData();
+  setInterval(()=>{ if(currentEmployee || isAdmin) loadData(true); }, REFRESH_INTERVAL_MS);
+} else {
+  renderSetupScreen();
+}
+</script>
+</body>
+</html>
