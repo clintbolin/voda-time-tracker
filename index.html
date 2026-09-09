@@ -1028,11 +1028,18 @@ function entryStatusText(entry){
 function openWhosOn(){ renderWhosOn(); openModal('modalWhosOn'); }
 function renderWhosOn(){
   const wrap = document.getElementById('whosOnList');
-  const onClock = entries.filter(e=>e.date===todayStr() && e.clockInAt && !e.clockOutAt);
+  const onClock = entries.filter(e=>{
+    if(e.date!==todayStr()) return false;
+    const shifts = ensureShifts(e);
+    if(shifts.length===0) return false;
+    return !shifts[shifts.length-1].clockOutAt; // last shift still open
+  });
   if(onClock.length===0){ wrap.innerHTML = `<div class="empty">Nobody's clocked in right now.</div>`; return; }
   onClock.sort((a,b)=>a.employeeName.localeCompare(b.employeeName));
   wrap.innerHTML = onClock.map(e=>{
-    const elapsed = fmtDuration(new Date() - new Date(e.clockInAt));
+    const shifts = ensureShifts(e);
+    const currentShift = shifts[shifts.length-1];
+    const elapsed = fmtDuration(new Date() - new Date(currentShift.clockInAt));
     return `<div class="list-row">
       <div class="nm">${escapeHtml(e.employeeName)}<div style="font-size:11.5px;color:var(--muted);font-weight:500;margin-top:2px;">${escapeHtml(entryStatusText(e))} &middot; ${elapsed} so far</div></div>
     </div>`;
