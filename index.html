@@ -213,6 +213,11 @@ main.content{padding:16px 14px 4px;}
 .payroll-page{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;}
 .payroll-page .ph-name{font-size:16px;font-weight:800;}
 .payroll-page .ph-period{font-size:12px;color:var(--muted);margin-bottom:12px;}
+.report-letterhead{display:flex;align-items:center;gap:14px;padding-bottom:14px;margin-bottom:14px;border-bottom:2px solid var(--black);}
+.report-letterhead img{height:46px;width:auto;border-radius:4px;}
+.report-letterhead .rl-co{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.4px;text-transform:uppercase;}
+.report-letterhead .rl-title{font-size:17px;font-weight:800;color:var(--ink);margin-top:1px;}
+.report-letterhead .rl-date{font-size:11px;color:var(--muted);margin-top:2px;}
 
 @media print{
   header.top, .quote-box, .admin-footer, .overlay:not(.active){ display:none !important; }
@@ -299,9 +304,9 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Manage employees</div><div class="sheet-sub">Who's on the sign-in list, and what they can access</div></div>
-    <button class="close-x" onclick="closeModal('modalEmployees')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="cancelEmployeeEdits()"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
-  <div class="hint" style="margin-top:0;">Check a box to give that person a shortcut to that section, right on their own screen — no separate login. Leave everything unchecked and they'll never see it.</div>
+  <div class="hint" style="margin-top:0;">Check a box to give that person a shortcut to that section, right on their own screen — no separate login. Leave everything unchecked and they'll never see it. Nothing here is permanent until you tap Save Changes.</div>
   <div class="field">
     <label>Add an employee</label>
     <div style="display:flex;gap:8px;">
@@ -310,6 +315,10 @@ main.content{padding:16px 14px 4px;}
     </div>
   </div>
   <div id="employeeList"></div>
+  <div class="btn-row" style="margin-top:16px;">
+    <button class="btn btn-ghost" onclick="cancelEmployeeEdits()">Cancel</button>
+    <button class="btn btn-gold" onclick="saveEmployeeEdits()">Save Changes</button>
+  </div>
 </div></div>
 
 <!-- Admin menu (only ever shows the sections this employee has been checked for) -->
@@ -375,6 +384,63 @@ main.content{padding:16px 14px 4px;}
   <div id="payrollReportBody"></div>
 </div></div>
 
+<!-- Employee Report -->
+<div class="overlay" id="modalEmployeeReport"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Employee report</div><div class="sheet-sub">Jobs worked, hours, and payroll breakdown</div></div>
+    <div style="display:flex;align-items:center;gap:13px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button class="close-x" onclick="closeModal('modalEmployeeReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
+  <div class="field"><label>Employee</label>
+    <input id="empReportName" list="empReportNameList" placeholder="Type or choose an employee" oninput="renderEmployeeReport()">
+    <datalist id="empReportNameList"></datalist>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <div class="field" style="flex:1;"><label>From</label><input type="date" id="empReportFrom" onchange="renderEmployeeReport()"></div>
+    <div class="field" style="flex:1;"><label>To</label><input type="date" id="empReportTo" onchange="renderEmployeeReport()"></div>
+  </div>
+  <div id="empReportBody"></div>
+</div></div>
+
+<!-- Job Report -->
+<div class="overlay" id="modalJobReport"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Job report</div><div class="sheet-sub">Everyone who worked a job, with dates &amp; times</div></div>
+    <div style="display:flex;align-items:center;gap:13px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button class="close-x" onclick="closeModal('modalJobReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
+  <div class="field"><label>Job name</label>
+    <input id="jobReportName" list="jobReportNameList" placeholder="Type or choose a job" oninput="renderJobReport()">
+    <datalist id="jobReportNameList"></datalist>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <div class="field" style="flex:1;"><label>From</label><input type="date" id="jobReportFrom" onchange="renderJobReport()"></div>
+    <div class="field" style="flex:1;"><label>To</label><input type="date" id="jobReportTo" onchange="renderJobReport()"></div>
+  </div>
+  <div id="jobReportBody"></div>
+</div></div>
+
+<!-- Adjust Time Entries -->
+<div class="overlay" id="modalAdjustTimes"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Adjust time entries</div><div class="sheet-sub">Fix a shift, job time, or delete a bad row</div></div>
+    <button class="close-x" onclick="closeModal('modalAdjustTimes')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="field"><label>Employee</label>
+    <input id="adjustEmpName" list="adjustEmpNameList" placeholder="Type or choose an employee" onchange="loadAdjustEntry()">
+    <datalist id="adjustEmpNameList"></datalist>
+  </div>
+  <div class="field"><label>Date</label><input type="date" id="adjustDate" onchange="loadAdjustEntry()"></div>
+  <div id="adjustTimesBody"></div>
+</div></div>
+
 <div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span id="toastMsg"></span></div>
 
 <script>
@@ -392,15 +458,15 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // checked, they never see the "Admin" link at all.
 const EMP_STORAGE_KEY = 'vodaTimeTrackerEmployee';
 const DEFAULT_EMPLOYEES = [
-  { name:"Clint Bolin", perms:{ vehicles:true, jobs:true, employees:true, reports:true } },
-  { name:"Cruz", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
-  { name:"Angela Hupp", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
-  { name:"Alyssa Miles", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
-  { name:"Julia Couch", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
-  { name:"Arturo Hoyos", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
-  { name:"Joe", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
-  { name:"Daniel", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
-  { name:"Miguel Perez", perms:{ vehicles:false, jobs:false, employees:false, reports:false } }
+  { name:"Clint Bolin", hourlyRate:0, perms:{ vehicles:true, jobs:true, employees:true, reports:true, adjustTimes:true } },
+  { name:"Cruz", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Angela Hupp", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Alyssa Miles", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Julia Couch", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Arturo Hoyos", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Joe", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Daniel", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Miguel Perez", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } }
 ];
 let currentUser = null; // { name }
 
@@ -416,7 +482,7 @@ let entries = [];      // all employees' day entries
 let vehicles = [...DEFAULT_VEHICLES];
 let jobNameList = [];  // manually managed fallback/supplement job names
 let jobTrackerNames = []; // fetched live from Job Tracker
-let employees = DEFAULT_EMPLOYEES.map(e=>({ name:e.name, perms:{...e.perms} }));
+let employees = DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
 let todayEntry = null; // current user's entry for today
 let editingVehicle = null;
 let tickHandle = null;
@@ -476,7 +542,7 @@ async function loadInitialData(){
     entries = data.entries || [];
     vehicles = (data.vehicles && data.vehicles.length) ? data.vehicles : [...DEFAULT_VEHICLES];
     jobNameList = data.jobNames || [];
-    employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, perms:{...e.perms} }));
+    employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
     fetchJobTrackerNames();
   }catch(e){
     console.error('load failed', e);
@@ -537,7 +603,7 @@ function switchEmployee(){
 // Manage Employees. Nothing to see, nothing to tap, if they have none.
 function currentPerms(){
   const emp = employees.find(e=>e.name===currentUser.name);
-  return (emp && emp.perms) || {vehicles:false,jobs:false,employees:false,reports:false};
+  return (emp && emp.perms) || {vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false};
 }
 function renderAdminFooter(){
   const wrap = document.getElementById('adminFooter');
@@ -547,15 +613,17 @@ function renderAdminFooter(){
   wrap.innerHTML = anyAccess ? `<span onclick="openAdminMenu()">Admin</span>` : '';
 }
 
-/* ============ MANAGE EMPLOYEES ============ */
+/* ============ MANAGE EMPLOYEES (draft + explicit Save/Cancel) ============ */
+let employeesDraft = null;
 function openManageEmployees(){
+  employeesDraft = employees.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
   renderEmployeeList();
   document.getElementById('employeeNameInput').value = '';
   openModal('modalEmployees');
 }
 function renderEmployeeList(){
   const wrap = document.getElementById('employeeList');
-  const sorted = [...employees].sort((a,b)=>a.name.localeCompare(b.name));
+  const sorted = [...employeesDraft].sort((a,b)=>a.name.localeCompare(b.name));
   if(sorted.length===0){ wrap.innerHTML = `<div class="empty">No employees yet.</div>`; return; }
   wrap.innerHTML = sorted.map(emp=>{
     const p = emp.perms || {};
@@ -563,42 +631,58 @@ function renderEmployeeList(){
     return `<div class="list-row" style="flex-direction:column;align-items:stretch;gap:9px;">
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <div class="nm">${escapeHtml(emp.name)}</div>
-        <button class="del-btn" onclick="removeEmployee('${nameEsc}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        <button class="del-btn" onclick="removeEmployeeDraft('${nameEsc}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
+        <span>Hourly rate $</span>
+        <input type="number" min="0" step="0.01" value="${emp.hourlyRate||''}" placeholder="0.00" style="width:80px;padding:5px 7px;border:1.5px solid var(--line);border-radius:7px;font-size:12px;" onchange="setDraftRate('${nameEsc}',this.value)">
+        <span style="color:var(--muted);">— used when sending hours to Job Tracker</span>
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);">
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.vehicles?'checked':''} onchange="setEmployeePermission('${nameEsc}','vehicles',this.checked)"> Vehicles</label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.jobs?'checked':''} onchange="setEmployeePermission('${nameEsc}','jobs',this.checked)"> Job list</label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.employees?'checked':''} onchange="setEmployeePermission('${nameEsc}','employees',this.checked)"> Employees</label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.reports?'checked':''} onchange="setEmployeePermission('${nameEsc}','reports',this.checked)"> Reports</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.vehicles?'checked':''} onchange="setDraftPermission('${nameEsc}','vehicles',this.checked)"> Vehicles</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.jobs?'checked':''} onchange="setDraftPermission('${nameEsc}','jobs',this.checked)"> Job list</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.employees?'checked':''} onchange="setDraftPermission('${nameEsc}','employees',this.checked)"> Employees</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.reports?'checked':''} onchange="setDraftPermission('${nameEsc}','reports',this.checked)"> Reports</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.adjustTimes?'checked':''} onchange="setDraftPermission('${nameEsc}','adjustTimes',this.checked)"> Adjust times</label>
       </div>
     </div>`;
   }).join('');
 }
-async function setEmployeePermission(name, key, val){
-  const emp = employees.find(e=>e.name===name);
+function setDraftRate(name, val){
+  const emp = employeesDraft.find(e=>e.name===name);
   if(!emp) return;
-  if(!emp.perms) emp.perms = {vehicles:false,jobs:false,employees:false,reports:false};
-  emp.perms[key] = val;
-  await saveEmployees();
-  if(currentUser && currentUser.name===name) renderAdminFooter();
+  emp.hourlyRate = Math.max(0, Number(val)||0);
 }
-async function confirmAddEmployee(){
+function setDraftPermission(name, key, val){
+  const emp = employeesDraft.find(e=>e.name===name);
+  if(!emp) return;
+  if(!emp.perms) emp.perms = {vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false};
+  emp.perms[key] = val;
+}
+function confirmAddEmployee(){
   const input = document.getElementById('employeeNameInput');
   const name = input.value.trim();
   if(!name){ showToast('Enter a name'); return; }
-  if(employees.some(e=>e.name.toLowerCase()===name.toLowerCase())){ showToast('Already on the list'); input.value=''; return; }
-  employees.push({ name, perms:{vehicles:false,jobs:false,employees:false,reports:false} });
-  await saveEmployees();
+  if(employeesDraft.some(e=>e.name.toLowerCase()===name.toLowerCase())){ showToast('Already on the list'); input.value=''; return; }
+  employeesDraft.push({ name, hourlyRate:0, perms:{vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false} });
   input.value='';
   renderEmployeeList();
-  showToast(`${name} added`);
 }
-async function removeEmployee(name){
-  if(!confirm(`Remove ${name} from the employee list? This does not delete their past time entries.`)) return;
-  employees = employees.filter(e=>e.name!==name);
-  await saveEmployees();
+function removeEmployeeDraft(name){
+  if(!confirm(`Remove ${name} from the employee list? This won't take effect until you tap Save Changes, and it doesn't delete their past time entries.`)) return;
+  employeesDraft = employeesDraft.filter(e=>e.name!==name);
   renderEmployeeList();
-  showToast(`${name} removed`);
+}
+function cancelEmployeeEdits(){
+  employeesDraft = null;
+  closeModal('modalEmployees');
+}
+async function saveEmployeeEdits(){
+  if(!confirm('Save these changes to the employee list and permissions?')) return;
+  employees = employeesDraft.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
+  employeesDraft = null;
+  const ok = await saveEmployees();
+  if(ok){ showToast('Employee changes saved'); renderAdminFooter(); closeModal('modalEmployees'); }
 }
 
 /* ============ TEAM TOOLS MENU (per-employee permissions, no PIN) ============ */
@@ -611,7 +695,10 @@ function openAdminMenu(){
     items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openDailyReport()">Daily hours report</button>`);
     items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openWeeklyReport()">Weekly hours report (Mon&ndash;Sun)</button>`);
     items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openPayrollReport()">2-week payroll report</button>`);
+    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openEmployeeReport()">Employee report (by name)</button>`);
+    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openJobReport()">Job report (by job name)</button>`);
   }
+  if(p.adjustTimes) items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openAdjustTimes()">Adjust time entries</button>`);
   if(p.vehicles) items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openManageVehicles()">Manage vehicles</button>`);
   if(p.jobs) items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openManageJobs()">Manage job list</button>`);
   if(p.employees) items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openManageEmployees()">Manage employees</button>`);
@@ -620,15 +707,64 @@ function openAdminMenu(){
 }
 
 /* ============ JOB TRACKER INTEGRATION ============ */
+let jobTrackerMap = {}; // customerName (lowercased) -> Job Tracker job id
+const JOB_LIST_MAX_AGE_DAYS = 60; // jobs drop off the picker this many days after landing
 async function fetchJobTrackerNames(){
   try{
     const res = await fetch(`${JOB_TRACKER_API_URL}?action=getAll`);
     if(!res.ok) return;
     const data = await res.json();
-    jobTrackerNames = (data.jobs||[]).filter(j=>!j.archived).map(j=>j.customerName).filter(Boolean);
+    // Only jobs that have actually landed (won) — Pipeline/Lost jobs would
+    // just clutter the dropdown with places nobody should be driving to yet.
+    // Also drop off automatically 60 days after landing, so the list doesn't
+    // grow forever across years of jobs — this is re-checked live on every
+    // load, so nothing needs a stored timer.
+    const cutoff = Date.now() - JOB_LIST_MAX_AGE_DAYS*86400000;
+    const landed = (data.jobs||[]).filter(j=>{
+      if(j.archived) return false;
+      const mit = j.scopes && j.scopes.mitigation;
+      const recon = j.scopes && j.scopes.reconstruction;
+      const mitLanded = mit && Number(mit.probability)>=100;
+      const reconLanded = recon && Number(recon.probability)>=100;
+      if(!mitLanded && !reconLanded) return false;
+      const landedAt = mitLanded ? mit.landedAt : recon.landedAt;
+      if(!landedAt) return true; // no landed date on record — don't hide a valid job over missing data
+      return new Date(landedAt).getTime() >= cutoff;
+    });
+    jobTrackerNames = landed.map(j=>j.customerName).filter(Boolean);
+    jobTrackerMap = {};
+    landed.forEach(j=>{ if(j.customerName) jobTrackerMap[j.customerName.toLowerCase()] = j.id; });
   }catch(e){
     console.warn('Job Tracker fetch failed — using the manual job list only:', e);
   }
+}
+
+/* ---- Push labor hours into Job Tracker's Mitigation labor cost ----
+   Job Tracker's own frontend works by fetching its ENTIRE jobs array,
+   mutating one job in memory, then POSTing the whole array back via
+   action "saveJobs" — every edit in Job Tracker follows this exact
+   pattern. This sync does the same round trip: fetch everything fresh,
+   touch ONLY the one target job's mitigation.laborCosts array, and post
+   straight back — every other job passes through untouched. */
+async function pushLaborCostToJobTracker(jobId, employeeName, amount, note){
+  const res = await fetch(`${JOB_TRACKER_API_URL}?action=getAll`);
+  if(!res.ok) throw new Error('Could not reach Job Tracker');
+  const data = await res.json();
+  const jobs = data.jobs || [];
+  const job = jobs.find(j=>j.id===jobId);
+  if(!job) throw new Error('That job no longer exists in Job Tracker (may have been archived).');
+  if(!job.scopes || !job.scopes.mitigation) throw new Error('This job has no Mitigation scope in Job Tracker.');
+  if(!Array.isArray(job.scopes.mitigation.laborCosts)) job.scopes.mitigation.laborCosts = [];
+  job.scopes.mitigation.laborCosts.push({ id: uid('TTLC'), amount, date: todayStr(), note });
+  job.updatedAt = new Date().toISOString();
+  const postRes = await fetch(JOB_TRACKER_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'saveJobs', data: jobs })
+  });
+  if(!postRes.ok) throw new Error('Job Tracker rejected the update');
+  const postData = await postRes.json().catch(()=>({}));
+  if(postData && postData.error) throw new Error(postData.error);
 }
 function allJobNames(){
   return [...new Set([...jobTrackerNames, ...jobNameList])].sort((a,b)=>a.localeCompare(b));
@@ -636,36 +772,36 @@ function allJobNames(){
 
 /* ============ MOTIVATIONAL QUOTE OF THE DAY ============ */
 const QUOTES = [
-  "Do the job right even when nobody's watching — that's the job that gets you called back.",
-  "A clean truck and a clear plan beat a rushed start every time.",
-  "The work you don't cut corners on is the work that builds your reputation.",
-  "Show up on time, do it right, treat people well. That's most of the job.",
-  "Nobody remembers how fast you worked. Everybody remembers how it looked when you left.",
-  "Take care of the little things — the tools, the truck, the paperwork — and the big things take care of themselves.",
-  "A good pre-trip check takes five minutes. A breakdown on the highway takes your whole day.",
-  "The best crews aren't the loudest — they're the ones who leave every job better than they found it.",
-  "Every job is someone's worst day. Show up like it matters, because it does.",
-  "Consistency beats intensity. Do the right thing daily, not just when it's convenient.",
-  "Your name is on the work, even when nobody's asking whose it was.",
-  "Slow is smooth, smooth is fast.",
-  "Take pride in the parts of the job no customer will ever see.",
-  "Respect the tools, respect the truck, respect the time — they're all on loan from tomorrow.",
-  "A tidy job site says more about you than any sales pitch could.",
-  "The way you handle a hard job is the way people decide whether to call you again.",
-  "Measure twice. Document once. Argue never.",
-  "Good habits at the start of the day save you headaches at the end of it.",
-  "The extra five minutes of care is never the five minutes you regret.",
-  "Nobody's paying attention until something goes wrong — so make sure nothing does.",
-  "Be the crew people trust with the keys, not just the job.",
-  "Hard work quietly done outperforms hard work loudly announced.",
-  "Treat every property like it's the one you'd want someone treating carefully in your own home.",
-  "Small consistent effort beats big occasional effort, every time.",
-  "The job's not done when the work's done — it's done when it's done right.",
-  "Show up ready, leave it better, say what you mean.",
-  "A well-kept vehicle is a promise to the next person who drives it.",
-  "Good communication prevents most of the problems people blame on 'bad luck.'",
-  "The details people don't ask about are exactly the ones worth getting right.",
-  "Being early is a habit. So is being late. Choose the one you want to be known for."
+  "Discipline is choosing between what you want now and what you want most.",
+  "Hard work beats talent when talent doesn't put in the work.",
+  "Perseverance isn't a single act of strength — it's the same choice, made again tomorrow.",
+  "The job doesn't care how you feel. Show up and do it anyway.",
+  "Discipline is what carries you on the days motivation doesn't.",
+  "Nobody sees the hours you put in before the job started paying off. Put them in anyway.",
+  "Endurance isn't glamorous. It's just refusing to quit before the work is done.",
+  "You don't rise to the level of your goals — you fall to the level of your discipline.",
+  "The difference between a good day and a bad one is often just whether you finished what you started.",
+  "Every skill you have now used to be something you were bad at. Keep going.",
+  "Comfort and growth don't share the same room. Pick one.",
+  "Hard work isn't the punishment — it's the price of the thing worth having.",
+  "The grind doesn't stop being the grind once you're good at it. It just gets easier to bear.",
+  "Persistence is doing the boring, necessary thing long after the excitement wore off.",
+  "Nobody drowns from falling in the water — they drown from staying there. Get back up.",
+  "A strong work ethic is a habit built one unremarkable day at a time.",
+  "The task in front of you doesn't get smaller by being avoided.",
+  "Discipline means doing it right when it would be easier to do it fast.",
+  "What feels hard today is what makes tomorrow feel possible.",
+  "You don't need to feel motivated. You need to show up anyway — that's the whole skill.",
+  "The ones who make it look easy are the ones who never stopped when it was hard.",
+  "Small effort, repeated without excuses, outperforms big effort you can't sustain.",
+  "Toughness isn't loud. It's just finishing the job when you'd rather not.",
+  "Every rep, every job, every hard day is training for the next hard day.",
+  "Excellence is built out of a thousand ordinary choices to not cut the corner.",
+  "You earn your reputation on the days no one's checking your work.",
+  "The work is the same whether you complain about it or not. Might as well not.",
+  "Growth happens exactly at the point where quitting starts to sound reasonable.",
+  "Nobody owes you an easy day. Earn the hard ones.",
+  "Consistency is a harder skill than talent, and it beats talent almost every time."
 ];
 function todaysQuote(){
   const start = new Date(new Date().getFullYear(), 0, 0);
@@ -678,10 +814,18 @@ function renderQuote(){
 }
 
 /* ============ WHO'S CLOCKED IN ============ */
+// Sums every shift's duration (a day can have more than one if the employee
+// was called back in after clocking out). Migrates old single clockInAt/
+// clockOutAt entries into a one-shift array on the fly.
+function ensureShifts(entry){
+  if(!entry.shifts){
+    entry.shifts = entry.clockInAt ? [{ clockInAt: entry.clockInAt, clockOutAt: entry.clockOutAt||null }] : [];
+  }
+  return entry.shifts;
+}
 function entryHoursMs(entry){
-  if(!entry.clockInAt) return 0;
-  const end = entry.clockOutAt ? new Date(entry.clockOutAt) : new Date();
-  return end - new Date(entry.clockInAt);
+  const shifts = ensureShifts(entry);
+  return shifts.reduce((sum,s)=> sum + ((s.clockOutAt?new Date(s.clockOutAt):new Date()) - new Date(s.clockInAt)), 0);
 }
 function entryStatusText(entry){
   if(!entry.preTripAt) return 'Pre-Trip pending';
@@ -712,6 +856,19 @@ function renderWhosOn(){
 function fmtDateShort(dateStr){
   return new Date(dateStr+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 }
+function reportLetterheadHtml(title){
+  const logoImg = document.querySelector('.brand-mark img');
+  const src = logoImg ? logoImg.src : '';
+  const now = new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+  return `<div class="report-letterhead">
+    <img src="${src}" alt="Voda">
+    <div>
+      <div class="rl-co">Voda Cleaning &amp; Restoration of Tucson</div>
+      <div class="rl-title">${title}</div>
+      <div class="rl-date">Generated ${now}</div>
+    </div>
+  </div>`;
+}
 function openDailyReport(){
   document.getElementById('dailyReportDate').value = todayStr();
   renderDailyReport();
@@ -721,9 +878,16 @@ function renderDailyReport(){
   const date = document.getElementById('dailyReportDate').value || todayStr();
   const wrap = document.getElementById('dailyReportBody');
   const rows = entries.filter(e=>e.date===date).sort((a,b)=>a.employeeName.localeCompare(b.employeeName));
-  if(rows.length===0){ wrap.innerHTML = `<div class="empty">No entries for ${fmtDateShort(date)}.</div>`; return; }
-  wrap.innerHTML = `<table class="report-table"><thead><tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Hours</th></tr></thead><tbody>
-    ${rows.map(e=>`<tr><td>${escapeHtml(e.employeeName)}</td><td>${fmtTime(e.clockInAt)}</td><td>${e.clockOutAt?fmtTime(e.clockOutAt):'In progress'}</td><td>${fmtDuration(entryHoursMs(e))}</td></tr>`).join('')}
+  const letterhead = reportLetterheadHtml('Daily Hours Report &mdash; '+fmtDateShort(date));
+  if(rows.length===0){ wrap.innerHTML = letterhead + `<div class="empty">No entries for ${fmtDateShort(date)}.</div>`; return; }
+  wrap.innerHTML = letterhead + `<table class="report-table"><thead><tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Hours</th></tr></thead><tbody>
+    ${rows.map(e=>{
+      const shifts = ensureShifts(e);
+      const clockIn = shifts.length ? fmtTime(shifts[0].clockInAt) : '—';
+      const last = shifts[shifts.length-1];
+      const clockOut = last && last.clockOutAt ? fmtTime(last.clockOutAt) : 'In progress';
+      return `<tr><td>${escapeHtml(e.employeeName)}</td><td>${clockIn}</td><td>${clockOut}</td><td>${fmtDuration(entryHoursMs(e))}</td></tr>`;
+    }).join('')}
   </tbody></table>`;
 }
 
@@ -764,8 +928,9 @@ function renderWeeklyReport(){
     rowsHtml += `<tr><td>${escapeHtml(name)}</td>${cells.map(c=>`<td>${c}</td>`).join('')}<td><b>${fmtDuration(totalMs)}</b></td></tr>`;
   });
   const wrap = document.getElementById('weeklyReportBody');
-  if(!rowsHtml){ wrap.innerHTML = `<div class="empty">No hours logged this week.</div>`; return; }
-  wrap.innerHTML = `<table class="report-table"><thead><tr><th>Employee</th>${dayLabels.map(d=>`<th>${d}</th>`).join('')}<th>Total</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+  const letterhead = reportLetterheadHtml('Weekly Hours Report');
+  if(!rowsHtml){ wrap.innerHTML = letterhead + `<div class="empty">No hours logged this week.</div>`; return; }
+  wrap.innerHTML = letterhead + `<table class="report-table"><thead><tr><th>Employee</th>${dayLabels.map(d=>`<th>${d}</th>`).join('')}<th>Total</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
 }
 
 /* ============ 2-WEEK PAYROLL REPORT ============ */
@@ -793,6 +958,7 @@ function renderPayrollReport(){
     });
     if(totalMs===0) return;
     html += `<div class="payroll-page">
+      ${reportLetterheadHtml('2-Week Payroll Report')}
       <div class="ph-name">${escapeHtml(name)}</div>
       <div class="ph-period">Pay period: ${fmtDateShort(days[0])} \u2013 ${fmtDateShort(days[13])}</div>
       <table class="report-table"><thead><tr><th>Date</th><th>Day</th><th>Hours</th></tr></thead><tbody>
@@ -837,7 +1003,7 @@ async function loadData(){
     entries = data.entries || [];
     vehicles = (data.vehicles && data.vehicles.length) ? data.vehicles : [...DEFAULT_VEHICLES];
     jobNameList = data.jobNames || [];
-    employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, perms:{...e.perms} }));
+    employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
     fetchJobTrackerNames();
     findTodayEntry();
     renderToday();
@@ -848,10 +1014,34 @@ async function loadData(){
     if(entries.length===0) renderSetupScreen(true);
   }
 }
-async function saveEntries(){ try{ await apiPost('saveEntries', entries); }catch(e){ console.error('save entries failed', e); showToast('Save failed — check your connection'); } }
-async function saveVehicles(){ try{ await apiPost('saveVehicles', vehicles); }catch(e){ showToast('Save failed'); } }
-async function saveJobNames(){ try{ await apiPost('saveJobNames', jobNameList); }catch(e){ showToast('Save failed'); } }
-async function saveEmployees(){ try{ await apiPost('saveEmployees', employees); }catch(e){ showToast('Save failed'); } }
+async function saveEntries(){
+  try{
+    const res = await apiPost('saveEntries', entries);
+    if(!res || !res.ok){ showToast('Save failed — backend rejected the update'); return false; }
+    return true;
+  }catch(e){ console.error('save entries failed', e); showToast('Save failed — check your connection'); return false; }
+}
+async function saveVehicles(){
+  try{
+    const res = await apiPost('saveVehicles', vehicles);
+    if(!res || !res.ok){ showToast('Save failed — backend rejected the update'); return false; }
+    return true;
+  }catch(e){ showToast('Save failed — check your connection'); return false; }
+}
+async function saveJobNames(){
+  try{
+    const res = await apiPost('saveJobNames', jobNameList);
+    if(!res || !res.ok){ showToast('Save failed — backend rejected the update'); return false; }
+    return true;
+  }catch(e){ showToast('Save failed — check your connection'); return false; }
+}
+async function saveEmployees(){
+  try{
+    const res = await apiPost('saveEmployees', employees);
+    if(!res || !res.ok){ showToast('Save failed — backend rejected the update. Make sure the Apps Script was redeployed as a NEW VERSION after the last update.'); return false; }
+    return true;
+  }catch(e){ showToast('Save failed — check your connection'); return false; }
+}
 
 function renderSetupScreen(failed){
   document.body.innerHTML = `
@@ -871,14 +1061,14 @@ function renderSetupScreen(failed){
 /* ============ TODAY ENTRY ============ */
 function findTodayEntry(){
   todayEntry = entries.find(e=>e.employeeName===currentUser.name && e.date===todayStr()) || null;
+  if(todayEntry) ensureShifts(todayEntry);
 }
 function newEntry(){
   return {
     id: uid('T'),
     employeeName: currentUser.name,
     date: todayStr(),
-    clockInAt: nowIso(),
-    clockOutAt: null,
+    shifts: [{ clockInAt: nowIso(), clockOutAt: null }],
     vehicle: '',
     preTripAt: null,
     jobLogs: [],
@@ -900,16 +1090,34 @@ function clockIn(){
   renderToday();
   showToast('Clocked in — have a good one!');
 }
+// Called back in after already clocking out today. Starts a new shift and
+// reopens the Post-Trip gate (since the vehicle may go out again), but
+// doesn't repeat Pre-Trip — same vehicle, already inspected once today.
+function clockBackIn(){
+  const shifts = ensureShifts(todayEntry);
+  shifts.push({ clockInAt: nowIso(), clockOutAt: null });
+  todayEntry.returnedToShopAt = null;
+  todayEntry.postTripAt = null;
+  todayEntry.postTripChecks = { clean:false, gas:false };
+  persistToday();
+  renderToday();
+  showToast('Clocked back in');
+}
+function onPreTripVehicleChange(){
+  const v = document.getElementById('preTripVehicle').value;
+  const wrap = document.getElementById('preTripAckWrap');
+  if(wrap) wrap.style.display = (v==='No Vehicle') ? 'none' : '';
+}
 function confirmPreTrip(){
   const vehicle = document.getElementById('preTripVehicle').value;
   const ack = document.getElementById('preTripAck').checked;
-  if(!vehicle){ showToast('Select which vehicle you\'re driving today'); return; }
-  if(!ack){ showToast('Check the box to confirm your Pre-Trip inspection'); return; }
+  if(!vehicle){ showToast('Select which vehicle you\'re driving today, or choose No Vehicle'); return; }
+  if(vehicle!=='No Vehicle' && !ack){ showToast('Check the box to confirm your Pre-Trip inspection'); return; }
   todayEntry.vehicle = vehicle;
   todayEntry.preTripAt = nowIso();
   persistToday();
   renderToday();
-  showToast('Pre-Trip complete');
+  showToast(vehicle==='No Vehicle' ? "No vehicle today — you're all set" : 'Pre-Trip complete');
 }
 function activeJobLog(){
   const logs = todayEntry.jobLogs;
@@ -922,7 +1130,8 @@ function startJob(){
   if(!name){ showToast('Enter or choose a job name'); return; }
   const active = activeJobLog();
   if(active) active.endedAt = nowIso();
-  todayEntry.jobLogs.push({ id: uid('JL'), jobName: name, jobId: null, startedAt: nowIso(), endedAt: null });
+  const jobId = jobTrackerMap[name.toLowerCase()] || null;
+  todayEntry.jobLogs.push({ id: uid('JL'), jobName: name, jobId, startedAt: nowIso(), endedAt: null });
   persistToday();
   renderToday();
   showToast(`Heading to ${name}`);
@@ -945,8 +1154,17 @@ function confirmPostTrip(){
   renderToday();
   showToast('Post-Trip complete');
 }
+function skipPostTrip(){
+  todayEntry.postTripChecks = { clean:false, gas:false, notApplicable:true };
+  todayEntry.postTripAt = nowIso();
+  persistToday();
+  renderToday();
+  showToast("All set — see you next time!");
+}
 function clockOut(){
-  todayEntry.clockOutAt = nowIso();
+  const shifts = ensureShifts(todayEntry);
+  const current = shifts[shifts.length-1];
+  current.clockOutAt = nowIso();
   persistToday();
   renderToday();
   showToast('Clocked out — see you next time!');
@@ -974,7 +1192,7 @@ function renderToday(){
   renderQuote();
   if(!el) return;
 
-  // 1. Not clocked in
+  // 1. Not clocked in (no entry at all today yet)
   if(!todayEntry){
     pill.textContent = 'Not clocked in';
     pill.className = 'status-pill off';
@@ -987,21 +1205,27 @@ function renderToday(){
     return;
   }
 
-  // Day already finished
-  if(todayEntry.clockOutAt){
+  const shifts = ensureShifts(todayEntry);
+  const currentShift = shifts[shifts.length-1];
+
+  // Day finished (current/last shift is clocked out, and no newer shift open)
+  if(currentShift.clockOutAt){
     pill.textContent = 'Clocked out';
     pill.className = 'status-pill off';
-    const total = fmtDuration(new Date(todayEntry.clockOutAt) - new Date(todayEntry.clockInAt));
+    const total = fmtDuration(entryHoursMs(todayEntry));
+    const shiftRows = shifts.map((s,i)=>`
+      <div class="summary-box"><div class="l">Shift ${i+1}</div><div class="v" style="font-size:14px;">${fmtTime(s.clockInAt)} &ndash; ${s.clockOutAt?fmtTime(s.clockOutAt):'—'}</div></div>`).join('');
     el.innerHTML = `
       <div class="card" style="text-align:center;">
         <div class="card-title">Day complete ✅</div>
         <div class="card-sub">Nice work — see you next time.</div>
         <div class="summary-grid">
-          <div class="summary-box"><div class="l">Clock in</div><div class="v">${fmtTime(todayEntry.clockInAt)}</div></div>
-          <div class="summary-box"><div class="l">Clock out</div><div class="v">${fmtTime(todayEntry.clockOutAt)}</div></div>
+          ${shiftRows}
           <div class="summary-box"><div class="l">Total hours</div><div class="v">${total}</div></div>
           <div class="summary-box"><div class="l">Vehicle</div><div class="v" style="font-size:13px;">${escapeHtml(todayEntry.vehicle||'—')}</div></div>
         </div>
+        <div class="hint">Got called back in? You can clock back in without redoing your Pre-Trip inspection.</div>
+        <button class="btn btn-ghost" onclick="clockBackIn()">Clock Back In</button>
       </div>
       ${jobLogRowsHtml()}`;
     return;
@@ -1013,19 +1237,22 @@ function renderToday(){
     pill.className = 'status-pill warn';
     el.innerHTML = `
       <div class="card">
-        <div class="card-eyebrow">Clocked in at ${fmtTime(todayEntry.clockInAt)}</div>
+        <div class="card-eyebrow">Clocked in at ${fmtTime(shifts[0].clockInAt)}</div>
         <div class="card-title">Pre-Trip inspection</div>
-        <div class="card-sub">Pick the vehicle you're driving today, then confirm it's ready to go.</div>
+        <div class="card-sub">Pick the vehicle you're driving today, then confirm it's ready to go. Not driving today? Choose No Vehicle.</div>
         <div class="field"><label>Vehicle</label>
-          <select id="preTripVehicle">
+          <select id="preTripVehicle" onchange="onPreTripVehicleChange()">
             <option value="">Select a vehicle…</option>
+            <option value="No Vehicle">No Vehicle</option>
             ${vehicles.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('')}
           </select>
         </div>
-        <label class="check-row" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px;">
-          <input type="checkbox" id="preTripAck">
-          <span class="txt">I've inspected the vehicle (tires, fluids, lights, no new damage) and it's ready to drive.</span>
-        </label>
+        <div id="preTripAckWrap">
+          <label class="check-row" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px;">
+            <input type="checkbox" id="preTripAck">
+            <span class="txt">I've inspected the vehicle (tires, fluids, lights, no new damage) and it's ready to drive.</span>
+          </label>
+        </div>
         <button class="btn btn-gold" onclick="confirmPreTrip()">Complete Pre-Trip</button>
       </div>`;
     return;
@@ -1072,7 +1299,7 @@ function renderToday(){
           </div>
           <div class="btn-row">
             <button class="btn btn-gold" onclick="startJob()">I'm heading there</button>
-            ${todayEntry.jobLogs.length>0 || true ? `<button class="btn btn-ghost" onclick="returnToShop()">Back to shop</button>` : ''}
+            <button class="btn btn-ghost" onclick="returnToShop()">Back to shop</button>
           </div>
         </div>
         ${jobLogRowsHtml()}`;
@@ -1084,6 +1311,17 @@ function renderToday(){
   if(!todayEntry.postTripAt){
     pill.textContent = 'Post-Trip needed';
     pill.className = 'status-pill warn';
+    if(todayEntry.vehicle === 'No Vehicle'){
+      el.innerHTML = `
+        <div class="card" style="text-align:center;">
+          <div class="card-eyebrow">Back at the shop</div>
+          <div class="card-title">All set</div>
+          <div class="card-sub">No vehicle to check in — you're ready to clock out.</div>
+          <button class="btn btn-gold" onclick="skipPostTrip()">Continue</button>
+        </div>
+        ${jobLogRowsHtml()}`;
+      return;
+    }
     el.innerHTML = `
       <div class="card">
         <div class="card-eyebrow">Back at the shop</div>
@@ -1106,7 +1344,7 @@ function renderToday(){
   // 5. Ready to clock out
   pill.textContent = 'Ready to clock out';
   pill.className = 'status-pill warn';
-  const soFar = fmtDuration(new Date() - new Date(todayEntry.clockInAt));
+  const soFar = fmtDuration(entryHoursMs(todayEntry));
   el.innerHTML = `
     <div class="card" style="text-align:center;">
       <div class="card-title">All set for the day</div>
@@ -1114,6 +1352,233 @@ function renderToday(){
       <button class="btn btn-red" onclick="clockOut()">Clock Out</button>
     </div>
     ${jobLogRowsHtml()}`;
+}
+
+/* ============ EMPLOYEE REPORT (search by name, custom date range) ============ */
+function openEmployeeReport(){
+  document.getElementById('empReportNameList').innerHTML = employees.map(e=>`<option value="${escapeHtml(e.name)}">`).join('');
+  document.getElementById('empReportName').value = '';
+  const to = todayStr();
+  document.getElementById('empReportFrom').value = addDays(to, -13);
+  document.getElementById('empReportTo').value = to;
+  document.getElementById('empReportBody').innerHTML = `<div class="empty">Choose an employee to see their report.</div>`;
+  openModal('modalEmployeeReport');
+}
+function renderEmployeeReport(){
+  const name = document.getElementById('empReportName').value.trim();
+  const from = document.getElementById('empReportFrom').value;
+  const to = document.getElementById('empReportTo').value;
+  const wrap = document.getElementById('empReportBody');
+  if(!name){ wrap.innerHTML = `<div class="empty">Choose an employee to see their report.</div>`; return; }
+  const matches = entries.filter(e=>e.employeeName.toLowerCase()===name.toLowerCase() && (!from||e.date>=from) && (!to||e.date<=to)).sort((a,b)=>a.date.localeCompare(b.date));
+  const letterhead = reportLetterheadHtml(`Employee Report &mdash; ${escapeHtml(name)}`);
+  if(matches.length===0){ wrap.innerHTML = letterhead + `<div class="empty">No time entries for ${escapeHtml(name)} in this range.</div>`; return; }
+
+  let jobRows = [];
+  matches.forEach(e=>{
+    e.jobLogs.forEach(jl=>{
+      const dur = fmtDuration((jl.endedAt?new Date(jl.endedAt):new Date()) - new Date(jl.startedAt));
+      jobRows.push(`<tr><td>${fmtDateShort(e.date)}</td><td>${escapeHtml(jl.jobName)}</td><td>${fmtTime(jl.startedAt)}</td><td>${jl.endedAt?fmtTime(jl.endedAt):'In progress'}</td><td>${dur}</td></tr>`);
+    });
+  });
+  const jobsTable = jobRows.length
+    ? `<table class="report-table"><thead><tr><th>Date</th><th>Job</th><th>Start</th><th>End</th><th>Hours</th></tr></thead><tbody>${jobRows.join('')}</tbody></table>`
+    : `<div class="empty">No jobs logged in this range (shop days only).</div>`;
+
+  const weekTotals = {};
+  let grandTotal = 0;
+  matches.forEach(e=>{
+    const wk = mondayOf(e.date);
+    const ms = entryHoursMs(e);
+    weekTotals[wk] = (weekTotals[wk]||0) + ms;
+    grandTotal += ms;
+  });
+  const weekKeys = Object.keys(weekTotals).sort();
+  const weeklyTable = `<table class="report-table"><thead><tr><th>Week of</th><th>Hours</th></tr></thead><tbody>
+    ${weekKeys.map(wk=>`<tr><td>${fmtDateShort(wk)}</td><td>${fmtDuration(weekTotals[wk])}</td></tr>`).join('')}
+  </tbody></table>`;
+
+  let biweekly = [];
+  for(let i=0;i<weekKeys.length;i+=2){
+    const w1 = weekKeys[i], w2 = weekKeys[i+1];
+    const ms = weekTotals[w1] + (w2?weekTotals[w2]:0);
+    const label = w2 ? `${fmtDateShort(w1)} \u2013 ${fmtDateShort(addDays(w2,6))}` : `${fmtDateShort(w1)} \u2013 ${fmtDateShort(addDays(w1,6))}`;
+    biweekly.push(`<tr><td>${label}</td><td>${fmtDuration(ms)}</td></tr>`);
+  }
+  const biweeklyTable = `<table class="report-table"><thead><tr><th>Pay period</th><th>Hours</th></tr></thead><tbody>${biweekly.join('')}</tbody></table>`;
+
+  wrap.innerHTML = `${letterhead}
+    <div class="card-eyebrow">Jobs worked (${fmtDateShort(from)} \u2013 ${fmtDateShort(to)})</div>
+    ${jobsTable}
+    <div class="card-eyebrow" style="margin-top:16px;">Weekly totals</div>
+    ${weeklyTable}
+    <div class="card-eyebrow" style="margin-top:16px;">Biweekly totals (payroll)</div>
+    ${biweeklyTable}
+    <div class="hint" style="margin-top:12px;font-weight:700;color:var(--ink);">Grand total: ${fmtDuration(grandTotal)}</div>`;
+}
+
+/* ============ JOB REPORT (search by job name, custom date range) ============ */
+function openJobReport(){
+  document.getElementById('jobReportNameList').innerHTML = allJobNames().map(n=>`<option value="${escapeHtml(n)}">`).join('');
+  document.getElementById('jobReportName').value = '';
+  const to = todayStr();
+  document.getElementById('jobReportFrom').value = addDays(to, -13);
+  document.getElementById('jobReportTo').value = to;
+  document.getElementById('jobReportBody').innerHTML = `<div class="empty">Choose a job to see who worked it.</div>`;
+  openModal('modalJobReport');
+}
+function renderJobReport(){
+  const jobName = document.getElementById('jobReportName').value.trim();
+  const from = document.getElementById('jobReportFrom').value;
+  const to = document.getElementById('jobReportTo').value;
+  const wrap = document.getElementById('jobReportBody');
+  if(!jobName){ wrap.innerHTML = `<div class="empty">Choose a job to see who worked it.</div>`; return; }
+  const letterhead = reportLetterheadHtml(`Job Report &mdash; ${escapeHtml(jobName)}`);
+  let sessionRows = [];
+  const perEmp = {}; // name -> { totalMs, unsyncedMs, jobId }
+  let grandTotal = 0;
+  entries.forEach(e=>{
+    if(from && e.date<from) return;
+    if(to && e.date>to) return;
+    e.jobLogs.forEach(jl=>{
+      if(jl.jobName.toLowerCase()!==jobName.toLowerCase()) return;
+      const ms = (jl.endedAt?new Date(jl.endedAt):new Date()) - new Date(jl.startedAt);
+      sessionRows.push({ date:e.date, name:e.employeeName, start:jl.startedAt, end:jl.endedAt, ms, synced:!!jl.syncedToJobTracker, jobId:jl.jobId||null });
+      if(!perEmp[e.employeeName]) perEmp[e.employeeName] = { totalMs:0, unsyncedMs:0, jobId:jl.jobId||null };
+      perEmp[e.employeeName].totalMs += ms;
+      if(!jl.syncedToJobTracker) perEmp[e.employeeName].unsyncedMs += ms;
+      if(jl.jobId) perEmp[e.employeeName].jobId = jl.jobId;
+      grandTotal += ms;
+    });
+  });
+  if(sessionRows.length===0){ wrap.innerHTML = letterhead + `<div class="empty">No one has logged time on "${escapeHtml(jobName)}" in this range.</div>`; return; }
+  sessionRows.sort((a,b)=> a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+  const sessionsTable = `<table class="report-table"><thead><tr><th>Date</th><th>Employee</th><th>Start</th><th>End</th><th>Hours</th><th>Sent?</th></tr></thead><tbody>
+    ${sessionRows.map(r=>`<tr><td>${fmtDateShort(r.date)}</td><td>${escapeHtml(r.name)}</td><td>${fmtTime(r.start)}</td><td>${r.end?fmtTime(r.end):'In progress'}</td><td>${fmtDuration(r.ms)}</td><td>${r.synced?'✅':'—'}</td></tr>`).join('')}
+  </tbody></table>`;
+  const empNames = Object.keys(perEmp).sort((a,b)=>a.localeCompare(b));
+  const perEmpTable = `<table class="report-table"><thead><tr><th>Employee</th><th>Total</th><th>Not yet sent</th><th></th></tr></thead><tbody>
+    ${empNames.map(n=>{
+      const row = perEmp[n];
+      const emp = employees.find(e=>e.name===n);
+      const rate = emp ? (emp.hourlyRate||0) : 0;
+      const canSend = row.unsyncedMs>0 && row.jobId;
+      let sendBtn;
+      if(row.unsyncedMs===0) sendBtn = `<span style="color:var(--muted);font-size:11.5px;">All sent</span>`;
+      else if(!row.jobId) sendBtn = `<span style="color:var(--muted);font-size:11.5px;">Not a Job Tracker job</span>`;
+      else sendBtn = `<button class="chip-sm" style="cursor:pointer;background:var(--gold-light);color:var(--black);" onclick="sendLaborToJobTracker('${escapeHtml(n).replace(/'/g,"\\'")}','${escapeHtml(jobName).replace(/'/g,"\\'")}',${row.jobId ? `'${row.jobId}'` : 'null'},${row.unsyncedMs},${rate})">Send ${fmtDuration(row.unsyncedMs)} ($${(row.unsyncedMs/3600000*rate).toFixed(2)})</button>`;
+      return `<tr><td>${escapeHtml(n)}</td><td>${fmtDuration(row.totalMs)}</td><td>${row.unsyncedMs>0?fmtDuration(row.unsyncedMs):'—'}</td><td>${sendBtn}</td></tr>`;
+    }).join('')}
+  </tbody></table>`;
+  wrap.innerHTML = `${letterhead}
+    <div class="card-eyebrow">Sessions (${fmtDateShort(from)} \u2013 ${fmtDateShort(to)})</div>
+    ${sessionsTable}
+    <div class="card-eyebrow" style="margin-top:16px;">Total per employee &amp; send to Job Tracker</div>
+    ${perEmpTable}
+    <div class="hint" style="margin-top:12px;font-weight:700;color:var(--ink);">Grand total (all employees): ${fmtDuration(grandTotal)}</div>
+    <div class="hint">Sends only the hours not already sent, as one Mitigation labor cost entry using that employee's hourly rate (set in Manage Employees).</div>`;
+}
+async function sendLaborToJobTracker(employeeName, jobName, jobId, unsyncedMs, rate){
+  if(!jobId){ showToast("This job isn't linked to Job Tracker"); return; }
+  const hours = unsyncedMs/3600000;
+  const amount = Math.round(hours*rate*100)/100;
+  if(rate<=0){
+    if(!confirm(`${employeeName} has no hourly rate set (in Manage Employees), so this would send $0.00 for ${fmtDuration(unsyncedMs)}. Send anyway?`)) return;
+  } else if(!confirm(`Send ${fmtDuration(unsyncedMs)} of ${employeeName}'s time on "${jobName}" to Job Tracker as a Mitigation labor cost of $${amount.toFixed(2)} (${hours.toFixed(2)}h \u00d7 $${rate}/hr)?`)){
+    return;
+  }
+  showToast('Sending to Job Tracker…');
+  try{
+    const note = `Time Tracker \u2014 ${employeeName}, ${fmtDuration(unsyncedMs)} (sent ${fmtDateShort(todayStr())})`;
+    await pushLaborCostToJobTracker(jobId, employeeName, amount, note);
+    const now = nowIso();
+    entries.forEach(e=>{
+      if(e.employeeName!==employeeName) return;
+      e.jobLogs.forEach(jl=>{
+        if(jl.jobName.toLowerCase()===jobName.toLowerCase() && jl.jobId===jobId && !jl.syncedToJobTracker){
+          jl.syncedToJobTracker = true;
+          jl.syncedAt = now;
+        }
+      });
+    });
+    await saveEntries();
+    showToast(`Sent $${amount.toFixed(2)} to Job Tracker`);
+    renderJobReport();
+  }catch(err){
+    console.error(err);
+    showToast('Send failed: ' + (err.message||'could not reach Job Tracker'));
+  }
+}
+
+/* ============ ADJUST TIME ENTRIES (admin-only time/date correction) ============ */
+let adjustDraft = null;
+function openAdjustTimes(){
+  document.getElementById('adjustEmpNameList').innerHTML = employees.map(e=>`<option value="${escapeHtml(e.name)}">`).join('');
+  document.getElementById('adjustEmpName').value = '';
+  document.getElementById('adjustDate').value = todayStr();
+  document.getElementById('adjustTimesBody').innerHTML = `<div class="empty">Choose an employee and date.</div>`;
+  adjustDraft = null;
+  openModal('modalAdjustTimes');
+}
+function loadAdjustEntry(){
+  const name = document.getElementById('adjustEmpName').value.trim();
+  const date = document.getElementById('adjustDate').value;
+  const wrap = document.getElementById('adjustTimesBody');
+  if(!name || !date){ wrap.innerHTML = `<div class="empty">Choose an employee and date.</div>`; adjustDraft = null; return; }
+  const entry = entries.find(e=>e.employeeName.toLowerCase()===name.toLowerCase() && e.date===date);
+  if(!entry){ wrap.innerHTML = `<div class="empty">No time entry for ${escapeHtml(name)} on ${fmtDateShort(date)}.</div>`; adjustDraft = null; return; }
+  ensureShifts(entry);
+  adjustDraft = JSON.parse(JSON.stringify(entry));
+  renderAdjustForm();
+}
+function toDatetimeLocal(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  const pad = n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fromDatetimeLocal(val){ return val ? new Date(val).toISOString() : null; }
+function renderAdjustForm(){
+  const wrap = document.getElementById('adjustTimesBody');
+  if(!adjustDraft){ wrap.innerHTML = `<div class="empty">Choose an employee and date.</div>`; return; }
+  const shiftsHtml = adjustDraft.shifts.map((s,i)=>`
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <div class="field" style="flex:1;margin-bottom:0;"><label>Shift ${i+1} in</label><input type="datetime-local" value="${toDatetimeLocal(s.clockInAt)}" onchange="adjustDraft.shifts[${i}].clockInAt=fromDatetimeLocal(this.value)"></div>
+      <div class="field" style="flex:1;margin-bottom:0;"><label>Shift ${i+1} out</label><input type="datetime-local" value="${toDatetimeLocal(s.clockOutAt)}" onchange="adjustDraft.shifts[${i}].clockOutAt=fromDatetimeLocal(this.value)"></div>
+    </div>`).join('');
+  const jobsHtml = adjustDraft.jobLogs.map((jl,i)=>`
+    <div class="list-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="nm">${escapeHtml(jl.jobName)}</div>
+        <button class="del-btn" onclick="adjustDraft.jobLogs.splice(${i},1);renderAdjustForm();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <input type="datetime-local" style="flex:1;font-size:12px;" value="${toDatetimeLocal(jl.startedAt)}" onchange="adjustDraft.jobLogs[${i}].startedAt=fromDatetimeLocal(this.value)">
+        <input type="datetime-local" style="flex:1;font-size:12px;" value="${toDatetimeLocal(jl.endedAt)}" onchange="adjustDraft.jobLogs[${i}].endedAt=fromDatetimeLocal(this.value)">
+      </div>
+    </div>`).join('');
+  wrap.innerHTML = `
+    <div class="card-eyebrow">Shifts</div>
+    ${shiftsHtml || '<div class="empty">No shifts.</div>'}
+    <div class="card-eyebrow" style="margin-top:14px;">Job logs (blank end = still in progress)</div>
+    ${jobsHtml || '<div class="empty">No jobs logged.</div>'}
+    <div class="btn-row" style="margin-top:16px;">
+      <button class="btn btn-ghost" onclick="loadAdjustEntry()">Cancel</button>
+      <button class="btn btn-gold" onclick="saveAdjustTimes()">Save Changes</button>
+    </div>`;
+}
+async function saveAdjustTimes(){
+  if(!adjustDraft) return;
+  if(!confirm("Save these time adjustments? This directly changes the employee's recorded hours.")) return;
+  const idx = entries.findIndex(e=>e.id===adjustDraft.id);
+  if(idx===-1){ showToast('Entry not found'); return; }
+  entries[idx] = adjustDraft;
+  const ok = await saveEntries();
+  if(ok){
+    showToast('Time entry updated');
+    if(todayEntry && todayEntry.id===adjustDraft.id){ todayEntry = adjustDraft; renderToday(); }
+    closeModal('modalAdjustTimes');
+  }
 }
 
 /* ============ MANAGE VEHICLES ============ */
