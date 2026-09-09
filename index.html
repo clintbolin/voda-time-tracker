@@ -441,7 +441,7 @@ main.content{padding:16px 14px 4px;}
   <div id="adjustTimesBody"></div>
 </div></div>
 
-<div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span id="toastMsg"></span></div>
+<div class="toast" id="toast" onclick="document.getElementById('toast').classList.remove('show')" style="cursor:pointer;" title="Tap to dismiss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span id="toastMsg"></span></div>
 
 <script>
 /* ============ CONFIG ============ */
@@ -510,7 +510,10 @@ function showToast(msg){
   document.getElementById('toastMsg').textContent = msg;
   t.classList.add('show');
   clearTimeout(window._toastTimer);
-  window._toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+  // Longer messages (like backend error details) need more time to read than
+  // a quick "Vehicle added" — scale with length, within a sane range.
+  const duration = Math.min(9000, Math.max(2200, msg.length * 60));
+  window._toastTimer = setTimeout(()=>t.classList.remove('show'), duration);
 }
 let _openModalCount = 0;
 function openModal(id){
@@ -677,11 +680,16 @@ function cancelEmployeeEdits(){
   employeesDraft = null;
   closeModal('modalEmployees');
 }
+let employeeSaveInFlight = false;
 async function saveEmployeeEdits(){
+  if(!employeesDraft || employeeSaveInFlight) return; // guards against a double-tap firing this twice
   if(!confirm('Save these changes to the employee list and permissions?')) return;
-  employees = employeesDraft.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
+  employeeSaveInFlight = true;
+  const draftCopy = employeesDraft.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
   employeesDraft = null;
+  employees = draftCopy;
   const ok = await saveEmployees();
+  employeeSaveInFlight = false;
   if(ok){ showToast('Employee changes saved'); renderAdminFooter(); closeModal('modalEmployees'); }
 }
 
@@ -1567,13 +1575,16 @@ function renderAdjustForm(){
       <button class="btn btn-gold" onclick="saveAdjustTimes()">Save Changes</button>
     </div>`;
 }
+let adjustSaveInFlight = false;
 async function saveAdjustTimes(){
-  if(!adjustDraft) return;
+  if(!adjustDraft || adjustSaveInFlight) return;
   if(!confirm("Save these time adjustments? This directly changes the employee's recorded hours.")) return;
+  adjustSaveInFlight = true;
   const idx = entries.findIndex(e=>e.id===adjustDraft.id);
-  if(idx===-1){ showToast('Entry not found'); return; }
+  if(idx===-1){ showToast('Entry not found'); adjustSaveInFlight = false; return; }
   entries[idx] = adjustDraft;
   const ok = await saveEntries();
+  adjustSaveInFlight = false;
   if(ok){
     showToast('Time entry updated');
     if(todayEntry && todayEntry.id===adjustDraft.id){ todayEntry = adjustDraft; renderToday(); }
