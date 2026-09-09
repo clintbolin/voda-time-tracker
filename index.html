@@ -36,6 +36,29 @@
   --gold:#C99A3D;
   --gold-light:#F0D896;
 }
+html[data-theme="dark"]{
+  --bg:#0A0A0A;
+  --card:#161616;
+  --ink:#F0EAD8;
+  --muted:#9C9488;
+  --line:#2A2A2A;
+  --green:#4ADE80;
+  --green-bg:rgba(74,222,128,0.15);
+  --blue:#60A5FA;
+  --blue-bg:rgba(96,165,250,0.15);
+  --amber:#F0D896;
+  --amber-bg:rgba(240,216,150,0.15);
+  --red:#F87171;
+  --red-bg:rgba(248,113,113,0.15);
+  --gray:#6B6459;
+  --gray-bg:#1E1E1E;
+}
+html[data-theme="dark"] body{ background:var(--bg); color:var(--ink); }
+html[data-theme="dark"] .status-pill.off{ background:rgba(255,255,255,0.1); color:rgba(255,255,255,0.6); }
+html[data-theme="dark"] input, html[data-theme="dark"] select{ background:#1E1E1E; color:var(--ink); border-color:var(--line); }
+html[data-theme="dark"] .admin-footer span{ color:#333; }
+html[data-theme="dark"] .btn-ghost{ background:var(--gray-bg); color:var(--ink); }
+html[data-theme="dark"] .summary-box{ background:var(--gray-bg); }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{
@@ -151,7 +174,7 @@ main.content{padding:16px 14px 4px;}
 }
 .overlay.active{display:flex;}
 .sheet{
-  background:#fff;width:100%;max-width:520px;border-radius:20px 20px 0 0;
+  background:var(--card);width:100%;max-width:520px;border-radius:20px 20px 0 0;
   max-height:92vh;overflow-y:auto;padding:6px 18px 24px;
   animation:slideup .22s ease-out;
 }
@@ -189,7 +212,7 @@ main.content{padding:16px 14px 4px;}
   display:flex; align-items:center; justify-content:center; padding:24px;
 }
 #authGateBox{
-  background:#fff; border-radius:18px; padding:32px 26px; max-width:360px; width:100%;
+  background:var(--card); border-radius:18px; padding:32px 26px; max-width:360px; width:100%;
   text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.35);
 }
 #authGateBox img.gate-logo{ width:190px; max-width:80%; height:auto; margin-bottom:18px; border-radius:8px; }
@@ -213,9 +236,12 @@ main.content{padding:16px 14px 4px;}
 .payroll-page{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;}
 .payroll-page .ph-name{font-size:16px;font-weight:800;}
 .payroll-page .ph-period{font-size:12px;color:var(--muted);margin-bottom:12px;}
+.signed-in-banner{position:relative;z-index:1;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.15);}
+.signed-in-banner .sib-label{font-size:10.5px;color:rgba(255,255,255,0.55);font-weight:700;letter-spacing:0.5px;}
+.signed-in-banner .sib-name{font-size:21px;color:var(--gold-light);font-weight:800;display:block;margin-top:1px;}
 .job-search-results{
   position:absolute; left:0; right:0; top:100%; margin-top:2px; z-index:20;
-  background:#fff; border:1.5px solid var(--line); border-radius:10px;
+  background:var(--card); border:1.5px solid var(--line); border-radius:10px;
   max-height:220px; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,0.12); display:none;
 }
 .job-search-results.show{ display:block; }
@@ -261,6 +287,7 @@ main.content{padding:16px 14px 4px;}
         <button id="userBadge" onclick="switchEmployee()" class="user-avatar" title="Switch employee"></button>
       </div>
     </div>
+    <div class="signed-in-banner" id="signedInBanner" style="display:none;"></div>
     <div class="header-meta">
       <div class="header-date" id="headerDate"></div>
       <div class="status-pill" id="statusPill">—</div>
@@ -310,6 +337,41 @@ main.content{padding:16px 14px 4px;}
 </div></div>
 
 <!-- Manage Employees -->
+<!-- Reports Hub -->
+<div class="overlay" id="modalReportsHub"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Reports</div><div class="sheet-sub">Everything in one place</div></div>
+    <button class="close-x" onclick="closeModal('modalReportsHub')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openWhosOn()">Who's clocked in now</button>
+    <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openDailyReport()">Daily hours report</button>
+    <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openWeeklyReport()">Weekly hours report (Mon&ndash;Sun)</button>
+    <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openPayrollReport()">2-week payroll report</button>
+    <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openEmployeeReport()">Employee report (by name)</button>
+    <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openJobReport()">Job report (by job name)</button>
+    <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openDetailedLaborReport()">Detailed labor report (by day)</button>
+  </div>
+</div></div>
+
+<!-- Login PIN -->
+<div class="overlay" id="modalLoginPin"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Login PIN</div><div class="sheet-sub">The shared PIN everyone enters to open the app</div></div>
+    <button class="close-x" onclick="closeModal('modalLoginPin')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="hint" style="margin-top:0;">Change this any time — for example when someone leaves the company. Everyone will need the new PIN the next time they open the app on a device that isn't already unlocked.</div>
+  <div class="field">
+    <label>New PIN</label>
+    <div style="display:flex;gap:8px;">
+      <input id="newLoginPinInput" type="password" inputmode="numeric" placeholder="New PIN" style="flex:1;">
+      <button class="btn btn-gold" style="width:auto;padding:0 18px;" onclick="confirmChangeLoginPin()">Save</button>
+    </div>
+  </div>
+</div></div>
+
 <div class="overlay" id="modalEmployees"><div class="sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-head">
@@ -437,6 +499,23 @@ main.content{padding:16px 14px 4px;}
 </div></div>
 
 <!-- Adjust Time Entries -->
+<!-- Detailed Labor Report -->
+<div class="overlay" id="modalDetailedLabor"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Detailed labor report</div><div class="sheet-sub">Employee, jobs, hours &amp; cost — per day</div></div>
+    <div style="display:flex;align-items:center;gap:13px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button class="close-x" onclick="closeModal('modalDetailedLabor')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <div class="field" style="flex:1;"><label>From</label><input type="date" id="detailedLaborFrom" onchange="renderDetailedLaborReport()"></div>
+    <div class="field" style="flex:1;"><label>To</label><input type="date" id="detailedLaborTo" onchange="renderDetailedLaborReport()"></div>
+  </div>
+  <div id="detailedLaborBody"></div>
+</div></div>
+
 <div class="overlay" id="modalAdjustTimes"><div class="sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-head">
@@ -459,6 +538,24 @@ const CONFIG = {
   API_URL: "https://script.google.com/macros/s/AKfycbxYbRsKXvc_LU1Q9glESAikQOHcG0fMGfsb8pWPXtM43elxav5XKtTB9CYRQDHJL_SHQA/exec"
 };
 const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !== 0;
+
+/* ============ DARK MODE ============ */
+const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
+function toggleDarkMode(){
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  if(isDark){
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.removeItem(DARK_MODE_KEY);
+    showToast('Light mode');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem(DARK_MODE_KEY, 'true');
+    showToast('Dark mode');
+  }
+}
+if(localStorage.getItem(DARK_MODE_KEY) === 'true'){
+  document.documentElement.setAttribute('data-theme', 'dark');
+}
 
 // Simple name-picker sign-in for now — no Google account needed. Anyone with
 // the link can pick a name (or add theirs) and clock in as that person.
@@ -493,6 +590,7 @@ let vehicles = [...DEFAULT_VEHICLES];
 let jobNameList = [];  // manually managed fallback/supplement job names
 let jobTrackerNames = []; // fetched live from Job Tracker
 let employees = DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
+let settings = { loginPin: '1234' };
 let todayEntry = null; // current user's entry for today
 let editingVehicle = null;
 let tickHandle = null;
@@ -539,15 +637,8 @@ function closeModal(id){
 
 /* ============ AUTH (Google Sign-In + approval + roles) — same pattern as Job Tracker ============ */
 /* ============ EMPLOYEE SIGN-IN (simple name picker) ============ */
-function boot(){
-  const saved = localStorage.getItem(EMP_STORAGE_KEY);
-  if(saved){
-    selectEmployee(saved, true);
-  } else {
-    document.getElementById('authGateBox').innerHTML = `<div class="gate-spinner"></div>`;
-    loadInitialData().then(()=> showEmployeePicker());
-  }
-}
+const PIN_UNLOCK_KEY = 'vodaTimeTrackerPinUnlocked';
+const DEFAULT_LOGIN_PIN = '1234';
 async function loadInitialData(){
   if(!BACKEND_READY){ renderSetupScreen(); return; }
   try{
@@ -556,11 +647,46 @@ async function loadInitialData(){
     vehicles = (data.vehicles && data.vehicles.length) ? data.vehicles : [...DEFAULT_VEHICLES];
     jobNameList = data.jobNames || [];
     employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
+    settings = (data.settings && data.settings.loginPin) ? data.settings : { loginPin: DEFAULT_LOGIN_PIN };
     fetchJobTrackerNames();
   }catch(e){
     console.error('load failed', e);
     renderSetupScreen(true);
   }
+}
+function boot(){
+  document.getElementById('authGateBox').innerHTML = `<div class="gate-spinner"></div>`;
+  loadInitialData().then(()=>{
+    if(sessionStorage.getItem(PIN_UNLOCK_KEY) === 'true'){
+      proceedPastPin();
+    } else {
+      showPinGate();
+    }
+  });
+}
+function proceedPastPin(){
+  const saved = localStorage.getItem(EMP_STORAGE_KEY);
+  if(saved && employees.some(e=>e.name===saved)){
+    selectEmployee(saved, true);
+  } else {
+    showEmployeePicker();
+  }
+}
+function showPinGate(){
+  const box = document.getElementById('authGateBox');
+  const logoImg = `<img class="gate-logo" src="${headerLogoSrc()}" alt="Voda">`;
+  box.innerHTML = `${logoImg}<h2>Enter PIN</h2><p>Ask your supervisor for the shared Time Tracker PIN.</p>
+    <input id="loginPinInput" type="password" inputmode="numeric" placeholder="••••" style="text-align:center;font-size:22px;letter-spacing:8px;border:1.5px solid var(--line);border-radius:10px;padding:12px;width:100%;box-sizing:border-box;margin-bottom:14px;" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmLoginPin();}">
+    <button class="btn btn-gold" onclick="confirmLoginPin()">Unlock</button>`;
+  setTimeout(()=>{ const el = document.getElementById('loginPinInput'); if(el) el.focus(); }, 60);
+}
+function confirmLoginPin(){
+  const input = document.getElementById('loginPinInput');
+  const pin = input.value.trim();
+  const correct = settings.loginPin || DEFAULT_LOGIN_PIN;
+  if(pin !== correct){ showToast('Incorrect PIN'); input.value=''; return; }
+  sessionStorage.setItem(PIN_UNLOCK_KEY, 'true');
+  proceedPastPin();
 }
 function headerLogoSrc(){
   const img = document.querySelector('.brand-mark img');
@@ -572,22 +698,34 @@ function showEmployeePicker(){
   const sorted = [...employees].sort((a,b)=>a.name.localeCompare(b.name));
   box.innerHTML = `${logoImg}<h2>Who's clocking in?</h2>
     <div style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;margin-bottom:14px;">
-      ${sorted.map(e=>`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="selectEmployee('${e.name.replace(/'/g,"\\'")}')">${escapeHtml(e.name)}</button>`).join('')}
+      ${sorted.map(e=>`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="confirmSignIn('${e.name.replace(/'/g,"\\'")}')">${escapeHtml(e.name)}</button>`).join('')}
     </div>
     <div style="display:flex;gap:8px;">
       <input id="newEmployeeName" placeholder="Not on the list? Type your name" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font-size:14px;">
       <button class="btn btn-gold" style="width:auto;padding:0 16px;" onclick="confirmAddEmployeeSelf()">Add</button>
     </div>`;
 }
+// A deliberate, hard-to-miss step between picking a name and actually being
+// signed in — catches the very common "tapped the wrong name in a list"
+// mistake before it ever reaches the timesheet.
+function confirmSignIn(name){
+  const box = document.getElementById('authGateBox');
+  const logoImg = `<img class="gate-logo" src="${headerLogoSrc()}" alt="Voda">`;
+  box.innerHTML = `${logoImg}
+    <p style="font-size:13px;color:var(--muted);margin-bottom:6px;">You are signing in as</p>
+    <h2 style="font-size:30px;margin-bottom:24px;">${escapeHtml(name)}</h2>
+    <button class="btn btn-gold" style="margin-bottom:10px;" onclick="selectEmployee('${name.replace(/'/g,"\\'")}')">Yes, that's me</button>
+    <button class="btn btn-ghost" onclick="showEmployeePicker()">Not me — go back</button>`;
+}
 async function confirmAddEmployeeSelf(){
   const input = document.getElementById('newEmployeeName');
   const name = input.value.trim();
   if(!name){ showToast('Enter your name'); return; }
   if(!employees.some(e=>e.name.toLowerCase()===name.toLowerCase())){
-    employees.push({ name, permissions:{vehicles:false,jobs:false,employees:false} });
+    employees.push({ name, hourlyRate:0, perms:{vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false} });
     await saveEmployees();
   }
-  selectEmployee(name);
+  confirmSignIn(name);
 }
 function selectEmployee(name, skipLoad){
   currentUser = { name };
@@ -597,14 +735,15 @@ function selectEmployee(name, skipLoad){
   const badge = document.getElementById('userBadge');
   badge.textContent = initials;
   badge.title = `Signed in as ${name} — tap to switch`;
-  if(skipLoad){
-    loadData();
-  } else {
-    findTodayEntry();
-    renderToday();
-    renderAdminFooter();
-    if(!tickHandle) tickHandle = setInterval(renderToday, 30000);
+  const banner = document.getElementById('signedInBanner');
+  if(banner){
+    banner.style.display = '';
+    banner.innerHTML = `<span class="sib-label">SIGNED IN AS</span><span class="sib-name">${escapeHtml(name)}</span>`;
   }
+  findTodayEntry();
+  renderToday();
+  renderAdminFooter();
+  if(!tickHandle) tickHandle = setInterval(renderToday, 30000);
 }
 function switchEmployee(){
   if(!confirm(`Switch off ${currentUser?currentUser.name:'this account'}?`)) return;
@@ -708,20 +847,37 @@ function openAdminMenu(){
   const p = currentPerms();
   document.getElementById('adminAsLabel').textContent = `Signed in as ${currentUser.name}`;
   const items = [];
-  if(p.reports){
-    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openWhosOn()">Who's clocked in now</button>`);
-    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openDailyReport()">Daily hours report</button>`);
-    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openWeeklyReport()">Weekly hours report (Mon&ndash;Sun)</button>`);
-    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openPayrollReport()">2-week payroll report</button>`);
-    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openEmployeeReport()">Employee report (by name)</button>`);
-    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openJobReport()">Job report (by job name)</button>`);
-  }
+  if(p.reports) items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openReportsHub()">Reports</button>`);
   if(p.adjustTimes) items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openAdjustTimes()">Adjust time entries</button>`);
   if(p.vehicles) items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openManageVehicles()">Manage vehicles</button>`);
   if(p.jobs) items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openManageJobs()">Manage job list</button>`);
-  if(p.employees) items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openManageEmployees()">Manage employees</button>`);
+  if(p.employees){
+    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openManageEmployees()">Manage employees</button>`);
+    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openLoginPinSettings()">Login PIN</button>`);
+  }
+  items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');toggleDarkMode()">Toggle dark mode</button>`);
   document.getElementById('adminMenuList').innerHTML = items.length ? items.join('') : `<div class="empty">Nothing available for this account.</div>`;
   openModal('modalAdmin');
+}
+function openLoginPinSettings(){
+  document.getElementById('newLoginPinInput').value = '';
+  openModal('modalLoginPin');
+}
+async function confirmChangeLoginPin(){
+  const pin = document.getElementById('newLoginPinInput').value.trim();
+  if(!pin){ showToast('Enter a new PIN'); return; }
+  if(!confirm(`Change the login PIN to "${pin}"? Everyone will need this new PIN the next time they open the app on a device that isn't already unlocked.`)) return;
+  settings.loginPin = pin;
+  try{
+    const res = await apiPost('saveSettings', settings);
+    if(!res || !res.ok){ showToast('Save failed — backend rejected the update'); return; }
+    document.getElementById('newLoginPinInput').value = '';
+    showToast('Login PIN updated');
+    closeModal('modalLoginPin');
+  }catch(e){ showToast('Save failed — check your connection'); }
+}
+function openReportsHub(){
+  openModal('modalReportsHub');
 }
 
 /* ============ JOB TRACKER INTEGRATION ============ */
@@ -1475,6 +1631,62 @@ function renderEmployeeReport(){
 }
 
 /* ============ JOB REPORT (search by job name, custom date range) ============ */
+/* ============ DETAILED LABOR REPORT (per day: employee, jobs, hours, cost) ============ */
+function openDetailedLaborReport(){
+  const to = todayStr();
+  document.getElementById('detailedLaborFrom').value = addDays(to, -6);
+  document.getElementById('detailedLaborTo').value = to;
+  renderDetailedLaborReport();
+  openModal('modalDetailedLabor');
+}
+function renderDetailedLaborReport(){
+  const from = document.getElementById('detailedLaborFrom').value;
+  const to = document.getElementById('detailedLaborTo').value;
+  const wrap = document.getElementById('detailedLaborBody');
+  const letterhead = reportLetterheadHtml('Detailed Labor Report');
+  const dayEntries = entries.filter(e=>(!from||e.date>=from) && (!to||e.date<=to)).sort((a,b)=> a.date.localeCompare(b.date) || a.employeeName.localeCompare(b.employeeName));
+  if(dayEntries.length===0){ wrap.innerHTML = letterhead + `<div class="empty">No time entries in this range.</div>`; return; }
+
+  const byDate = {};
+  dayEntries.forEach(e=>{ (byDate[e.date] = byDate[e.date]||[]).push(e); });
+  const dates = Object.keys(byDate).sort();
+
+  let grandTotalMs = 0, grandTotalCost = 0;
+  let html = '';
+  dates.forEach(date=>{
+    let dayRows = '';
+    let dayMs = 0, dayCost = 0;
+    byDate[date].forEach(e=>{
+      const emp = employees.find(x=>x.name===e.employeeName);
+      const rate = emp ? (emp.hourlyRate||0) : 0;
+      const totalMs = entryHoursMs(e);
+      let attributedMs = 0;
+      e.jobLogs.forEach(jl=>{
+        const ms = (jl.endedAt?new Date(jl.endedAt):new Date()) - new Date(jl.startedAt);
+        attributedMs += ms;
+        const cost = ms/3600000*rate;
+        dayRows += `<tr><td>${escapeHtml(e.employeeName)}</td><td>${escapeHtml(jl.jobName)}</td><td>${fmtDuration(ms)}</td><td>$${cost.toFixed(2)}</td></tr>`;
+        dayMs += ms; dayCost += cost;
+      });
+      const remainderMs = totalMs - attributedMs;
+      if(remainderMs > 60000){
+        const cost = remainderMs/3600000*rate;
+        dayRows += `<tr><td>${escapeHtml(e.employeeName)}</td><td style="color:var(--muted);">Shop / Unassigned</td><td>${fmtDuration(remainderMs)}</td><td>$${cost.toFixed(2)}</td></tr>`;
+        dayMs += remainderMs; dayCost += cost;
+      }
+    });
+    grandTotalMs += dayMs; grandTotalCost += dayCost;
+    html += `<div class="card-eyebrow" style="margin-top:16px;">${fmtDateShort(date)}</div>
+      <table class="report-table"><thead><tr><th>Employee</th><th>Job</th><th>Hours</th><th>Cost</th></tr></thead><tbody>
+        ${dayRows}
+        <tr style="font-weight:700;background:var(--gray-bg);"><td colspan="2">Day total</td><td>${fmtDuration(dayMs)}</td><td>$${dayCost.toFixed(2)}</td></tr>
+      </tbody></table>`;
+  });
+
+  wrap.innerHTML = `${letterhead}${html}
+    <div class="hint" style="margin-top:14px;font-weight:700;color:var(--ink);">Grand total (${fmtDateShort(from)} \u2013 ${fmtDateShort(to)}): ${fmtDuration(grandTotalMs)} &mdash; $${grandTotalCost.toFixed(2)}</div>`;
+}
+
 function openJobReport(){
   document.getElementById('jobReportNameList').innerHTML = allJobNames().map(n=>`<option value="${escapeHtml(n)}">`).join('');
   document.getElementById('jobReportName').value = '';
