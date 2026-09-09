@@ -213,6 +213,16 @@ main.content{padding:16px 14px 4px;}
 .payroll-page{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;}
 .payroll-page .ph-name{font-size:16px;font-weight:800;}
 .payroll-page .ph-period{font-size:12px;color:var(--muted);margin-bottom:12px;}
+.job-search-results{
+  position:absolute; left:0; right:0; top:100%; margin-top:2px; z-index:20;
+  background:#fff; border:1.5px solid var(--line); border-radius:10px;
+  max-height:220px; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,0.12); display:none;
+}
+.job-search-results.show{ display:block; }
+.job-search-results .jsr-row{ padding:11px 13px; font-size:14px; cursor:pointer; border-bottom:1px solid var(--line); }
+.job-search-results .jsr-row:last-child{ border-bottom:none; }
+.job-search-results .jsr-row:active{ background:var(--gray-bg); }
+.job-search-results .jsr-admin{ color:var(--gold-dark,#B8863A); font-weight:700; }
 .report-letterhead{display:flex;align-items:center;gap:14px;padding-bottom:14px;margin-bottom:14px;border-bottom:2px solid var(--black);}
 .report-letterhead img{height:46px;width:auto;border-radius:4px;}
 .report-letterhead .rl-co{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.4px;text-transform:uppercase;}
@@ -1113,14 +1123,17 @@ function clockBackIn(){
 }
 function onPreTripVehicleChange(){
   const v = document.getElementById('preTripVehicle').value;
+  if(v==='No Vehicle'){ confirmPreTrip(); return; } // skip straight to job selection — no pre-trip needed at all
   const wrap = document.getElementById('preTripAckWrap');
-  if(wrap) wrap.style.display = (v==='No Vehicle') ? 'none' : '';
+  if(wrap) wrap.style.display = '';
 }
 function confirmPreTrip(){
   const vehicle = document.getElementById('preTripVehicle').value;
   const ack = document.getElementById('preTripAck').checked;
+  const signed = document.getElementById('preTripSigned').checked;
   if(!vehicle){ showToast('Select which vehicle you\'re driving today, or choose No Vehicle'); return; }
   if(vehicle!=='No Vehicle' && !ack){ showToast('Check the box to confirm your Pre-Trip inspection'); return; }
+  if(vehicle!=='No Vehicle' && !signed){ showToast('Check the box confirming your paper Pre-Trip sheet is signed'); return; }
   todayEntry.vehicle = vehicle;
   todayEntry.preTripAt = nowIso();
   persistToday();
@@ -1155,8 +1168,9 @@ function returnToShop(){
 function confirmPostTrip(){
   const clean = document.getElementById('postTripClean').checked;
   const gas = document.getElementById('postTripGas').checked;
-  if(!clean || !gas){ showToast('Check both boxes to confirm your Post-Trip'); return; }
-  todayEntry.postTripChecks = { clean, gas };
+  const signed = document.getElementById('postTripSigned').checked;
+  if(!clean || !gas || !signed){ showToast('Check all three boxes to confirm your Post-Trip'); return; }
+  todayEntry.postTripChecks = { clean, gas, signed };
   todayEntry.postTripAt = nowIso();
   persistToday();
   renderToday();
@@ -1190,9 +1204,36 @@ function jobLogRowsHtml(){
   }).join('');
   return `<div class="card"><div class="card-eyebrow">Today's jobs</div>${rows}</div>`;
 }
-function jobDatalistHtml(){
-  return allJobNames().map(n=>`<option value="${escapeHtml(n)}">`).join('');
+// "Admin" is a pinned pseudo-job for office/no-vehicle days — it's never a
+// real Job Tracker job (jobTrackerMap has no entry for it), so time logged
+// under it naturally never shows a "Send to Job Tracker" option later.
+const ADMIN_JOB_LABEL = 'Admin';
+function renderJobSearchResults(query){
+  const box = document.getElementById('jobSearchResults');
+  if(!box) return;
+  const q = (query||'').trim().toLowerCase();
+  const names = allJobNames();
+  const matches = q ? names.filter(n=>n.toLowerCase().includes(q)) : names;
+  const showAdmin = !q || ADMIN_JOB_LABEL.toLowerCase().includes(q);
+  const rows = [];
+  if(showAdmin) rows.push(`<div class="jsr-row jsr-admin" onmousedown="selectJobSearchResult('${ADMIN_JOB_LABEL}')">${ADMIN_JOB_LABEL} (office / no job today)</div>`);
+  matches.slice(0,25).forEach(n=>{
+    rows.push(`<div class="jsr-row" onmousedown="selectJobSearchResult('${escapeHtml(n).replace(/'/g,"\\'")}')">${escapeHtml(n)}</div>`);
+  });
+  if(rows.length===0){ box.classList.remove('show'); return; }
+  box.innerHTML = rows.join('');
+  box.classList.add('show');
 }
+function selectJobSearchResult(name){
+  const input = document.getElementById('jobNameInput2');
+  if(input) input.value = name;
+  const box = document.getElementById('jobSearchResults');
+  if(box) box.classList.remove('show');
+}
+document.addEventListener('click', (e)=>{
+  const box = document.getElementById('jobSearchResults');
+  if(box && !e.target.closest('.job-search-results') && e.target.id!=='jobNameInput2') box.classList.remove('show');
+});
 function renderToday(){
   const el = document.getElementById('todayContent');
   const pill = document.getElementById('statusPill');
@@ -1247,7 +1288,7 @@ function renderToday(){
       <div class="card">
         <div class="card-eyebrow">Clocked in at ${fmtTime(shifts[0].clockInAt)}</div>
         <div class="card-title">Pre-Trip inspection</div>
-        <div class="card-sub">Pick the vehicle you're driving today, then confirm it's ready to go. Not driving today? Choose No Vehicle.</div>
+        <div class="card-sub">Pick the vehicle you're driving today, then confirm it's ready to go. Not driving today? Choose No Vehicle to skip straight to your job.</div>
         <div class="field"><label>Vehicle</label>
           <select id="preTripVehicle" onchange="onPreTripVehicleChange()">
             <option value="">Select a vehicle…</option>
@@ -1256,9 +1297,13 @@ function renderToday(){
           </select>
         </div>
         <div id="preTripAckWrap">
-          <label class="check-row" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px;">
+          <label class="check-row" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;">
             <input type="checkbox" id="preTripAck">
             <span class="txt">I've inspected the vehicle (tires, fluids, lights, no new damage) and it's ready to drive.</span>
+          </label>
+          <label class="check-row" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px;">
+            <input type="checkbox" id="preTripSigned">
+            <span class="txt">I have completed and signed the paper Pre-Trip inspection sheet.</span>
           </label>
         </div>
         <button class="btn btn-gold" onclick="confirmPreTrip()">Complete Pre-Trip</button>
@@ -1281,10 +1326,10 @@ function renderToday(){
             <div class="job-since">Since ${fmtTime(active.startedAt)}</div>
             <div class="job-elapsed">${elapsed}</div>
           </div>
-          <div class="field" style="margin-bottom:10px;">
+          <div class="field" style="margin-bottom:10px;position:relative;">
             <label>Next job</label>
-            <input id="jobNameInput2" list="jobNameOptions" placeholder="Job name">
-            <datalist id="jobNameOptions">${jobDatalistHtml()}</datalist>
+            <input id="jobNameInput2" placeholder="Search or type a job name" autocomplete="off" oninput="renderJobSearchResults(this.value)" onfocus="renderJobSearchResults(this.value)">
+            <div id="jobSearchResults" class="job-search-results"></div>
           </div>
           <div class="btn-row">
             <button class="btn btn-black" onclick="startJob()">Heading to next job</button>
@@ -1300,10 +1345,10 @@ function renderToday(){
           <div class="card-eyebrow">Vehicle: ${escapeHtml(todayEntry.vehicle)}</div>
           <div class="card-title">Where are you headed?</div>
           <div class="card-sub">Log the job before you leave — this starts the timer for travel and time on site.</div>
-          <div class="field">
+          <div class="field" style="position:relative;">
             <label>Job name</label>
-            <input id="jobNameInput2" list="jobNameOptions" placeholder="Type or choose a job">
-            <datalist id="jobNameOptions">${jobDatalistHtml()}</datalist>
+            <input id="jobNameInput2" placeholder="Search or type a job name" autocomplete="off" oninput="renderJobSearchResults(this.value)" onfocus="renderJobSearchResults(this.value)">
+            <div id="jobSearchResults" class="job-search-results"></div>
           </div>
           <div class="btn-row">
             <button class="btn btn-gold" onclick="startJob()">I'm heading there</button>
@@ -1339,9 +1384,13 @@ function renderToday(){
           <input type="checkbox" id="postTripClean">
           <span class="txt">Vehicle is clean (trash removed, swept out)</span>
         </label>
-        <label class="check-row" style="margin-bottom:16px;">
+        <label class="check-row">
           <input type="checkbox" id="postTripGas">
           <span class="txt">At least a half tank of gas</span>
+        </label>
+        <label class="check-row" style="margin-bottom:16px;">
+          <input type="checkbox" id="postTripSigned">
+          <span class="txt">I have completed and signed the paper Post-Trip inspection sheet.</span>
         </label>
         <button class="btn btn-gold" onclick="confirmPostTrip()">Complete Post-Trip</button>
       </div>
@@ -1550,15 +1599,16 @@ function renderAdjustForm(){
   const wrap = document.getElementById('adjustTimesBody');
   if(!adjustDraft){ wrap.innerHTML = `<div class="empty">Choose an employee and date.</div>`; return; }
   const shiftsHtml = adjustDraft.shifts.map((s,i)=>`
-    <div style="display:flex;gap:8px;margin-bottom:10px;">
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:flex-end;">
       <div class="field" style="flex:1;margin-bottom:0;"><label>Shift ${i+1} in</label><input type="datetime-local" value="${toDatetimeLocal(s.clockInAt)}" onchange="adjustDraft.shifts[${i}].clockInAt=fromDatetimeLocal(this.value)"></div>
       <div class="field" style="flex:1;margin-bottom:0;"><label>Shift ${i+1} out</label><input type="datetime-local" value="${toDatetimeLocal(s.clockOutAt)}" onchange="adjustDraft.shifts[${i}].clockOutAt=fromDatetimeLocal(this.value)"></div>
+      ${adjustDraft.shifts.length>1 ? `<button class="del-btn" style="flex-shrink:0;" onclick="deleteAdjustShift(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>` : ''}
     </div>`).join('');
   const jobsHtml = adjustDraft.jobLogs.map((jl,i)=>`
     <div class="list-row" style="flex-direction:column;align-items:stretch;gap:8px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div class="nm">${escapeHtml(jl.jobName)}</div>
-        <button class="del-btn" onclick="adjustDraft.jobLogs.splice(${i},1);renderAdjustForm();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        <button class="del-btn" onclick="deleteAdjustJobLog(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
       </div>
       <div style="display:flex;gap:8px;">
         <input type="datetime-local" style="flex:1;font-size:12px;" value="${toDatetimeLocal(jl.startedAt)}" onchange="adjustDraft.jobLogs[${i}].startedAt=fromDatetimeLocal(this.value)">
@@ -1573,7 +1623,35 @@ function renderAdjustForm(){
     <div class="btn-row" style="margin-top:16px;">
       <button class="btn btn-ghost" onclick="loadAdjustEntry()">Cancel</button>
       <button class="btn btn-gold" onclick="saveAdjustTimes()">Save Changes</button>
-    </div>`;
+    </div>
+    <div style="height:1px;background:var(--line);margin:18px 0 14px;"></div>
+    <button class="btn btn-red" onclick="deleteAdjustEntireEntry()">Delete This Entire Day's Entry</button>
+    <div class="hint">For test data or a forgotten clock-in/out — permanently removes this whole day for this employee.</div>`;
+}
+function deleteAdjustShift(i){
+  if(!confirm(`Delete Shift ${i+1}? This can't be undone until you also tap Save Changes, but there's no confirmation after that.`)) return;
+  adjustDraft.shifts.splice(i,1);
+  renderAdjustForm();
+}
+function deleteAdjustJobLog(i){
+  const jl = adjustDraft.jobLogs[i];
+  if(!confirm(`Delete the "${jl.jobName}" job log entry? This takes effect once you tap Save Changes.`)) return;
+  adjustDraft.jobLogs.splice(i,1);
+  renderAdjustForm();
+}
+async function deleteAdjustEntireEntry(){
+  if(!adjustDraft) return;
+  if(!confirm(`Permanently delete ${adjustDraft.employeeName}'s entire time entry for ${fmtDateShort(adjustDraft.date)}? This cannot be undone.`)) return;
+  const idx = entries.findIndex(e=>e.id===adjustDraft.id);
+  if(idx===-1){ showToast('Entry not found'); return; }
+  entries.splice(idx,1);
+  const ok = await saveEntries();
+  if(ok){
+    showToast('Entry deleted');
+    if(todayEntry && todayEntry.id===adjustDraft.id){ todayEntry = null; renderToday(); }
+    adjustDraft = null;
+    closeModal('modalAdjustTimes');
+  }
 }
 let adjustSaveInFlight = false;
 async function saveAdjustTimes(){
