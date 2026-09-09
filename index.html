@@ -140,10 +140,10 @@ main.content{padding:16px 14px 4px;}
 .hint{font-size:12px;color:var(--muted);background:var(--gray-bg);border-radius:8px;padding:9px 11px;margin-top:4px;margin-bottom:14px;line-height:1.45;}
 .empty{text-align:center;padding:24px 12px;color:var(--muted);font-size:13px;}
 
-.admin-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:8px 0 20px;}
-.admin-links button{
-  background:none;border:none;color:var(--muted);font-size:12px;font-weight:600;padding:6px 4px;cursor:pointer;text-decoration:underline;
-}
+.quote-box{text-align:center;font-size:12.5px;font-style:italic;color:var(--muted);padding:14px 18px 4px;line-height:1.5;}
+.admin-footer{text-align:center;padding:18px 0 4px;}
+.admin-footer span{font-size:10.5px;color:var(--line);cursor:pointer;letter-spacing:0.3px;}
+.admin-footer span:active{color:var(--muted);}
 
 .overlay{
   position:fixed;inset:0;background:rgba(10,10,10,0.55);z-index:100;
@@ -206,6 +206,31 @@ main.content{padding:16px 14px 4px;}
   display:inline-block; font-size:10px; font-weight:800; padding:3px 10px; border-radius:99px;
   background:var(--gray-bg); color:var(--muted); text-transform:uppercase; letter-spacing:.3px; margin-top:8px;
 }
+.report-table{border-collapse:collapse;width:100%;font-size:12.5px;}
+.report-table th{background:var(--black);color:#fff;padding:8px 9px;text-align:left;font-weight:700;}
+.report-table td{padding:7px 9px;border-bottom:1px solid var(--line);}
+.report-table tr:nth-child(even) td{background:var(--gray-bg);}
+.payroll-page{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;}
+.payroll-page .ph-name{font-size:16px;font-weight:800;}
+.payroll-page .ph-period{font-size:12px;color:var(--muted);margin-bottom:12px;}
+
+@media print{
+  header.top, .quote-box, .admin-footer, .overlay:not(.active){ display:none !important; }
+  body{ background:#fff !important; padding-bottom:0 !important; }
+  body.printing-overlay main.content{ display:none !important; }
+  body.printing-overlay .overlay.active{
+    position:static !important; display:block !important; background:none !important; padding:0 !important;
+  }
+  body.printing-overlay .overlay.active .sheet{
+    max-height:none !important; box-shadow:none !important; border-radius:0 !important;
+    overflow:visible !important; padding:0 !important; max-width:none !important;
+  }
+  body.printing-overlay .sheet-handle,
+  body.printing-overlay .close-x,
+  body.printing-overlay input[type=date],
+  body.printing-overlay .field label{ display:none !important; }
+  .payroll-page{ break-after:page; border:none; }
+}
 </style>
 </head>
 <body>
@@ -229,11 +254,8 @@ main.content{padding:16px 14px 4px;}
 
   <main class="content">
     <div id="todayContent"></div>
-    <div class="admin-links" id="adminLinks" style="display:none;">
-      <button onclick="openManageVehicles()">Manage vehicles</button>
-      <button onclick="openManageJobs()">Manage job list</button>
-      <button onclick="openManageEmployees()">Manage employees</button>
-    </div>
+    <div class="quote-box" id="quoteBox"></div>
+    <div class="admin-footer" id="adminFooter"></div>
   </main>
 </div>
 
@@ -276,9 +298,10 @@ main.content{padding:16px 14px 4px;}
 <div class="overlay" id="modalEmployees"><div class="sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-head">
-    <div><div class="sheet-title">Manage employees</div><div class="sheet-sub">Who shows up on the sign-in list</div></div>
+    <div><div class="sheet-title">Manage employees</div><div class="sheet-sub">Who's on the sign-in list, and what they can access</div></div>
     <button class="close-x" onclick="closeModal('modalEmployees')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
+  <div class="hint" style="margin-top:0;">Check a box to give that person a shortcut to that section, right on their own screen — no separate login. Leave everything unchecked and they'll never see it.</div>
   <div class="field">
     <label>Add an employee</label>
     <div style="display:flex;gap:8px;">
@@ -287,6 +310,69 @@ main.content{padding:16px 14px 4px;}
     </div>
   </div>
   <div id="employeeList"></div>
+</div></div>
+
+<!-- Admin menu (only ever shows the sections this employee has been checked for) -->
+<div class="overlay" id="modalAdmin"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Team tools</div><div class="sheet-sub" id="adminAsLabel"></div></div>
+    <button class="close-x" onclick="closeModal('modalAdmin')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div id="adminMenuList" style="display:flex;flex-direction:column;gap:8px;"></div>
+</div></div>
+
+<!-- Who's Clocked In -->
+<div class="overlay" id="modalWhosOn"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Who's clocked in</div><div class="sheet-sub">Live status, right now</div></div>
+    <button class="close-x" onclick="closeModal('modalWhosOn')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div id="whosOnList"></div>
+</div></div>
+
+<!-- Daily Hours Report -->
+<div class="overlay" id="modalDailyReport"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Daily hours</div><div class="sheet-sub">One day, every employee</div></div>
+    <div style="display:flex;align-items:center;gap:13px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button class="close-x" onclick="closeModal('modalDailyReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
+  <div class="field"><label>Date</label><input type="date" id="dailyReportDate" onchange="renderDailyReport()"></div>
+  <div id="dailyReportBody"></div>
+</div></div>
+
+<!-- Weekly Hours Report -->
+<div class="overlay" id="modalWeeklyReport"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Weekly hours</div><div class="sheet-sub">Monday&ndash;Sunday, every employee</div></div>
+    <div style="display:flex;align-items:center;gap:13px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button class="close-x" onclick="closeModal('modalWeeklyReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
+  <div class="field"><label>Any day in the week</label><input type="date" id="weeklyReportDate" onchange="renderWeeklyReport()"></div>
+  <div id="weeklyReportSummary" class="hint" style="margin-top:0;"></div>
+  <div style="overflow-x:auto;"><div id="weeklyReportBody"></div></div>
+</div></div>
+
+<!-- 2-Week Payroll Report -->
+<div class="overlay" id="modalPayrollReport"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Payroll report</div><div class="sheet-sub">2-week period, one page per employee</div></div>
+    <div style="display:flex;align-items:center;gap:13px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button class="close-x" onclick="closeModal('modalPayrollReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
+  <div class="field"><label>Pay period start (a Monday)</label><input type="date" id="payrollStartDate" onchange="renderPayrollReport()"></div>
+  <div id="payrollReportBody"></div>
 </div></div>
 
 <div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span id="toastMsg"></span></div>
@@ -299,22 +385,38 @@ const CONFIG = {
 const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !== 0;
 
 // Simple name-picker sign-in for now — no Google account needed. Anyone with
-// the link can pick a name (or add theirs) and clock in as that person, and
-// everyone can see the Manage links below. There's no real access control
-// here; swap this for real Google Sign-In later if that matters more than
-// speed of rollout (see the "wrongrole"/Google-auth code in Job Tracker for
-// the pattern to bring back).
+// the link can pick a name (or add theirs) and clock in as that person.
+// "Team tools" access is per-employee (set in Manage Employees) — four
+// independent checkboxes (Vehicles / Job List / Employees / Reports). A
+// person only ever sees the categories checked for their name; if none are
+// checked, they never see the "Admin" link at all.
 const EMP_STORAGE_KEY = 'vodaTimeTrackerEmployee';
-const DEFAULT_EMPLOYEES = ["Cruz","Angela Hupp","Alyssa Miles","Julia Couch","Arturo Hoyos","Joe","Daniel","Miguel Perez"];
+const DEFAULT_EMPLOYEES = [
+  { name:"Clint Bolin", perms:{ vehicles:true, jobs:true, employees:true, reports:true } },
+  { name:"Cruz", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
+  { name:"Angela Hupp", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
+  { name:"Alyssa Miles", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
+  { name:"Julia Couch", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
+  { name:"Arturo Hoyos", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
+  { name:"Joe", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
+  { name:"Daniel", perms:{ vehicles:false, jobs:false, employees:false, reports:false } },
+  { name:"Miguel Perez", perms:{ vehicles:false, jobs:false, employees:false, reports:false } }
+];
 let currentUser = null; // { name }
 
 const DEFAULT_VEHICLES = ["ProMaster #1","ProMaster #2","ProMaster #3","Other / Rental"];
 
+// Job Tracker's own backend — used to pull real job/customer names so
+// techs pick from the same list Job Tracker uses. Falls back silently to
+// the manually managed job list below if this can't be reached.
+const JOB_TRACKER_API_URL = "https://script.google.com/macros/s/AKfycbxIOIYM6L4MNXAJF79axSqgCcrl2UTcNnuMKOf27C5aXphlNExTOIfQIGpbU6B-kpDt9A/exec";
+
 /* ============ STATE ============ */
 let entries = [];      // all employees' day entries
 let vehicles = [...DEFAULT_VEHICLES];
-let jobNameList = [];
-let employees = [...DEFAULT_EMPLOYEES];
+let jobNameList = [];  // manually managed fallback/supplement job names
+let jobTrackerNames = []; // fetched live from Job Tracker
+let employees = DEFAULT_EMPLOYEES.map(e=>({ name:e.name, perms:{...e.perms} }));
 let todayEntry = null; // current user's entry for today
 let editingVehicle = null;
 let tickHandle = null;
@@ -374,7 +476,8 @@ async function loadInitialData(){
     entries = data.entries || [];
     vehicles = (data.vehicles && data.vehicles.length) ? data.vehicles : [...DEFAULT_VEHICLES];
     jobNameList = data.jobNames || [];
-    employees = (data.employees && data.employees.length) ? data.employees : [...DEFAULT_EMPLOYEES];
+    employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, perms:{...e.perms} }));
+    fetchJobTrackerNames();
   }catch(e){
     console.error('load failed', e);
     renderSetupScreen(true);
@@ -387,10 +490,10 @@ function headerLogoSrc(){
 function showEmployeePicker(){
   const box = document.getElementById('authGateBox');
   const logoImg = `<img class="gate-logo" src="${headerLogoSrc()}" alt="Voda">`;
-  const sorted = [...employees].sort((a,b)=>a.localeCompare(b));
+  const sorted = [...employees].sort((a,b)=>a.name.localeCompare(b.name));
   box.innerHTML = `${logoImg}<h2>Who's clocking in?</h2>
     <div style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;margin-bottom:14px;">
-      ${sorted.map(n=>`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="selectEmployee('${n.replace(/'/g,"\\'")}')">${escapeHtml(n)}</button>`).join('')}
+      ${sorted.map(e=>`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="selectEmployee('${e.name.replace(/'/g,"\\'")}')">${escapeHtml(e.name)}</button>`).join('')}
     </div>
     <div style="display:flex;gap:8px;">
       <input id="newEmployeeName" placeholder="Not on the list? Type your name" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font-size:14px;">
@@ -401,8 +504,8 @@ async function confirmAddEmployeeSelf(){
   const input = document.getElementById('newEmployeeName');
   const name = input.value.trim();
   if(!name){ showToast('Enter your name'); return; }
-  if(!employees.some(e=>e.toLowerCase()===name.toLowerCase())){
-    employees.push(name);
+  if(!employees.some(e=>e.name.toLowerCase()===name.toLowerCase())){
+    employees.push({ name, permissions:{vehicles:false,jobs:false,employees:false} });
     await saveEmployees();
   }
   selectEmployee(name);
@@ -415,12 +518,12 @@ function selectEmployee(name, skipLoad){
   const badge = document.getElementById('userBadge');
   badge.textContent = initials;
   badge.title = `Signed in as ${name} — tap to switch`;
-  document.getElementById('adminLinks').style.display = 'flex';
   if(skipLoad){
     loadData();
   } else {
     findTodayEntry();
     renderToday();
+    renderAdminFooter();
     if(!tickHandle) tickHandle = setInterval(renderToday, 30000);
   }
 }
@@ -429,8 +532,22 @@ function switchEmployee(){
   localStorage.removeItem(EMP_STORAGE_KEY);
   location.reload();
 }
+// The small footer row: a single "Admin" link that only appears at all if
+// this signed-in person has been checked for at least one category in
+// Manage Employees. Nothing to see, nothing to tap, if they have none.
+function currentPerms(){
+  const emp = employees.find(e=>e.name===currentUser.name);
+  return (emp && emp.perms) || {vehicles:false,jobs:false,employees:false,reports:false};
+}
+function renderAdminFooter(){
+  const wrap = document.getElementById('adminFooter');
+  if(!wrap || !currentUser) return;
+  const p = currentPerms();
+  const anyAccess = p.vehicles || p.jobs || p.employees || p.reports;
+  wrap.innerHTML = anyAccess ? `<span onclick="openAdminMenu()">Admin</span>` : '';
+}
 
-/* ============ MANAGE EMPLOYEES (admin-ish; anyone can reach it for now) ============ */
+/* ============ MANAGE EMPLOYEES ============ */
 function openManageEmployees(){
   renderEmployeeList();
   document.getElementById('employeeNameInput').value = '';
@@ -438,20 +555,39 @@ function openManageEmployees(){
 }
 function renderEmployeeList(){
   const wrap = document.getElementById('employeeList');
-  const sorted = [...employees].sort((a,b)=>a.localeCompare(b));
+  const sorted = [...employees].sort((a,b)=>a.name.localeCompare(b.name));
   if(sorted.length===0){ wrap.innerHTML = `<div class="empty">No employees yet.</div>`; return; }
-  wrap.innerHTML = sorted.map(n=>`
-    <div class="list-row">
-      <div class="nm">${escapeHtml(n)}</div>
-      <button class="del-btn" onclick="removeEmployee('${escapeHtml(n).replace(/'/g,"\\'")}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-    </div>`).join('');
+  wrap.innerHTML = sorted.map(emp=>{
+    const p = emp.perms || {};
+    const nameEsc = escapeHtml(emp.name).replace(/'/g,"\\'");
+    return `<div class="list-row" style="flex-direction:column;align-items:stretch;gap:9px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="nm">${escapeHtml(emp.name)}</div>
+        <button class="del-btn" onclick="removeEmployee('${nameEsc}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.vehicles?'checked':''} onchange="setEmployeePermission('${nameEsc}','vehicles',this.checked)"> Vehicles</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.jobs?'checked':''} onchange="setEmployeePermission('${nameEsc}','jobs',this.checked)"> Job list</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.employees?'checked':''} onchange="setEmployeePermission('${nameEsc}','employees',this.checked)"> Employees</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.reports?'checked':''} onchange="setEmployeePermission('${nameEsc}','reports',this.checked)"> Reports</label>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function setEmployeePermission(name, key, val){
+  const emp = employees.find(e=>e.name===name);
+  if(!emp) return;
+  if(!emp.perms) emp.perms = {vehicles:false,jobs:false,employees:false,reports:false};
+  emp.perms[key] = val;
+  await saveEmployees();
+  if(currentUser && currentUser.name===name) renderAdminFooter();
 }
 async function confirmAddEmployee(){
   const input = document.getElementById('employeeNameInput');
   const name = input.value.trim();
   if(!name){ showToast('Enter a name'); return; }
-  if(employees.some(e=>e.toLowerCase()===name.toLowerCase())){ showToast('Already on the list'); input.value=''; return; }
-  employees.push(name);
+  if(employees.some(e=>e.name.toLowerCase()===name.toLowerCase())){ showToast('Already on the list'); input.value=''; return; }
+  employees.push({ name, perms:{vehicles:false,jobs:false,employees:false,reports:false} });
   await saveEmployees();
   input.value='';
   renderEmployeeList();
@@ -459,10 +595,224 @@ async function confirmAddEmployee(){
 }
 async function removeEmployee(name){
   if(!confirm(`Remove ${name} from the employee list? This does not delete their past time entries.`)) return;
-  employees = employees.filter(e=>e!==name);
+  employees = employees.filter(e=>e.name!==name);
   await saveEmployees();
   renderEmployeeList();
   showToast(`${name} removed`);
+}
+
+/* ============ TEAM TOOLS MENU (per-employee permissions, no PIN) ============ */
+function openAdminMenu(){
+  const p = currentPerms();
+  document.getElementById('adminAsLabel').textContent = `Signed in as ${currentUser.name}`;
+  const items = [];
+  if(p.reports){
+    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openWhosOn()">Who's clocked in now</button>`);
+    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openDailyReport()">Daily hours report</button>`);
+    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openWeeklyReport()">Weekly hours report (Mon&ndash;Sun)</button>`);
+    items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openPayrollReport()">2-week payroll report</button>`);
+  }
+  if(p.vehicles) items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openManageVehicles()">Manage vehicles</button>`);
+  if(p.jobs) items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openManageJobs()">Manage job list</button>`);
+  if(p.employees) items.push(`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalAdmin');openManageEmployees()">Manage employees</button>`);
+  document.getElementById('adminMenuList').innerHTML = items.length ? items.join('') : `<div class="empty">Nothing available for this account.</div>`;
+  openModal('modalAdmin');
+}
+
+/* ============ JOB TRACKER INTEGRATION ============ */
+async function fetchJobTrackerNames(){
+  try{
+    const res = await fetch(`${JOB_TRACKER_API_URL}?action=getAll`);
+    if(!res.ok) return;
+    const data = await res.json();
+    jobTrackerNames = (data.jobs||[]).filter(j=>!j.archived).map(j=>j.customerName).filter(Boolean);
+  }catch(e){
+    console.warn('Job Tracker fetch failed — using the manual job list only:', e);
+  }
+}
+function allJobNames(){
+  return [...new Set([...jobTrackerNames, ...jobNameList])].sort((a,b)=>a.localeCompare(b));
+}
+
+/* ============ MOTIVATIONAL QUOTE OF THE DAY ============ */
+const QUOTES = [
+  "Do the job right even when nobody's watching — that's the job that gets you called back.",
+  "A clean truck and a clear plan beat a rushed start every time.",
+  "The work you don't cut corners on is the work that builds your reputation.",
+  "Show up on time, do it right, treat people well. That's most of the job.",
+  "Nobody remembers how fast you worked. Everybody remembers how it looked when you left.",
+  "Take care of the little things — the tools, the truck, the paperwork — and the big things take care of themselves.",
+  "A good pre-trip check takes five minutes. A breakdown on the highway takes your whole day.",
+  "The best crews aren't the loudest — they're the ones who leave every job better than they found it.",
+  "Every job is someone's worst day. Show up like it matters, because it does.",
+  "Consistency beats intensity. Do the right thing daily, not just when it's convenient.",
+  "Your name is on the work, even when nobody's asking whose it was.",
+  "Slow is smooth, smooth is fast.",
+  "Take pride in the parts of the job no customer will ever see.",
+  "Respect the tools, respect the truck, respect the time — they're all on loan from tomorrow.",
+  "A tidy job site says more about you than any sales pitch could.",
+  "The way you handle a hard job is the way people decide whether to call you again.",
+  "Measure twice. Document once. Argue never.",
+  "Good habits at the start of the day save you headaches at the end of it.",
+  "The extra five minutes of care is never the five minutes you regret.",
+  "Nobody's paying attention until something goes wrong — so make sure nothing does.",
+  "Be the crew people trust with the keys, not just the job.",
+  "Hard work quietly done outperforms hard work loudly announced.",
+  "Treat every property like it's the one you'd want someone treating carefully in your own home.",
+  "Small consistent effort beats big occasional effort, every time.",
+  "The job's not done when the work's done — it's done when it's done right.",
+  "Show up ready, leave it better, say what you mean.",
+  "A well-kept vehicle is a promise to the next person who drives it.",
+  "Good communication prevents most of the problems people blame on 'bad luck.'",
+  "The details people don't ask about are exactly the ones worth getting right.",
+  "Being early is a habit. So is being late. Choose the one you want to be known for."
+];
+function todaysQuote(){
+  const start = new Date(new Date().getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((new Date() - start) / 86400000);
+  return QUOTES[dayOfYear % QUOTES.length];
+}
+function renderQuote(){
+  const el = document.getElementById('quoteBox');
+  if(el) el.textContent = '"' + todaysQuote() + '"';
+}
+
+/* ============ WHO'S CLOCKED IN ============ */
+function entryHoursMs(entry){
+  if(!entry.clockInAt) return 0;
+  const end = entry.clockOutAt ? new Date(entry.clockOutAt) : new Date();
+  return end - new Date(entry.clockInAt);
+}
+function entryStatusText(entry){
+  if(!entry.preTripAt) return 'Pre-Trip pending';
+  if(!entry.returnedToShopAt){
+    const logs = entry.jobLogs;
+    const last = logs[logs.length-1];
+    if(last && !last.endedAt) return 'On job: ' + last.jobName;
+    return 'Between jobs';
+  }
+  if(!entry.postTripAt) return 'Post-Trip pending';
+  return 'Ready to clock out';
+}
+function openWhosOn(){ renderWhosOn(); openModal('modalWhosOn'); }
+function renderWhosOn(){
+  const wrap = document.getElementById('whosOnList');
+  const onClock = entries.filter(e=>e.date===todayStr() && e.clockInAt && !e.clockOutAt);
+  if(onClock.length===0){ wrap.innerHTML = `<div class="empty">Nobody's clocked in right now.</div>`; return; }
+  onClock.sort((a,b)=>a.employeeName.localeCompare(b.employeeName));
+  wrap.innerHTML = onClock.map(e=>{
+    const elapsed = fmtDuration(new Date() - new Date(e.clockInAt));
+    return `<div class="list-row">
+      <div class="nm">${escapeHtml(e.employeeName)}<div style="font-size:11.5px;color:var(--muted);font-weight:500;margin-top:2px;">${escapeHtml(entryStatusText(e))} &middot; ${elapsed} so far</div></div>
+    </div>`;
+  }).join('');
+}
+
+/* ============ DAILY HOURS REPORT ============ */
+function fmtDateShort(dateStr){
+  return new Date(dateStr+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+function openDailyReport(){
+  document.getElementById('dailyReportDate').value = todayStr();
+  renderDailyReport();
+  openModal('modalDailyReport');
+}
+function renderDailyReport(){
+  const date = document.getElementById('dailyReportDate').value || todayStr();
+  const wrap = document.getElementById('dailyReportBody');
+  const rows = entries.filter(e=>e.date===date).sort((a,b)=>a.employeeName.localeCompare(b.employeeName));
+  if(rows.length===0){ wrap.innerHTML = `<div class="empty">No entries for ${fmtDateShort(date)}.</div>`; return; }
+  wrap.innerHTML = `<table class="report-table"><thead><tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Hours</th></tr></thead><tbody>
+    ${rows.map(e=>`<tr><td>${escapeHtml(e.employeeName)}</td><td>${fmtTime(e.clockInAt)}</td><td>${e.clockOutAt?fmtTime(e.clockOutAt):'In progress'}</td><td>${fmtDuration(entryHoursMs(e))}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+/* ============ WEEKLY HOURS REPORT (Mon–Sun) ============ */
+function mondayOf(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const day = d.getDay(); // 0=Sun..6=Sat
+  d.setDate(d.getDate() + (day===0 ? -6 : 1-day));
+  return d.toISOString().slice(0,10);
+}
+function addDays(dateStr, n){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate()+n);
+  return d.toISOString().slice(0,10);
+}
+function openWeeklyReport(){
+  document.getElementById('weeklyReportDate').value = todayStr();
+  renderWeeklyReport();
+  openModal('modalWeeklyReport');
+}
+function renderWeeklyReport(){
+  const anyDate = document.getElementById('weeklyReportDate').value || todayStr();
+  const monday = mondayOf(anyDate);
+  const days = Array.from({length:7}, (_,i)=>addDays(monday,i));
+  document.getElementById('weeklyReportSummary').textContent = `Week of ${fmtDateShort(monday)} \u2013 ${fmtDateShort(days[6])}`;
+  const names = [...new Set([...employees.map(e=>e.name), ...entries.map(e=>e.employeeName)])].sort((a,b)=>a.localeCompare(b));
+  const dayLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  let rowsHtml = '';
+  names.forEach(name=>{
+    let totalMs = 0;
+    const cells = days.map(d=>{
+      const entry = entries.find(e=>e.employeeName===name && e.date===d);
+      const ms = entry ? entryHoursMs(entry) : 0;
+      totalMs += ms;
+      return ms>0 ? fmtDuration(ms) : '\u2014';
+    });
+    if(totalMs===0) return;
+    rowsHtml += `<tr><td>${escapeHtml(name)}</td>${cells.map(c=>`<td>${c}</td>`).join('')}<td><b>${fmtDuration(totalMs)}</b></td></tr>`;
+  });
+  const wrap = document.getElementById('weeklyReportBody');
+  if(!rowsHtml){ wrap.innerHTML = `<div class="empty">No hours logged this week.</div>`; return; }
+  wrap.innerHTML = `<table class="report-table"><thead><tr><th>Employee</th>${dayLabels.map(d=>`<th>${d}</th>`).join('')}<th>Total</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+}
+
+/* ============ 2-WEEK PAYROLL REPORT ============ */
+function openPayrollReport(){
+  const periodStart = addDays(mondayOf(todayStr()), -14);
+  document.getElementById('payrollStartDate').value = periodStart;
+  renderPayrollReport();
+  openModal('modalPayrollReport');
+}
+function renderPayrollReport(){
+  const start = document.getElementById('payrollStartDate').value;
+  const wrap = document.getElementById('payrollReportBody');
+  if(!start){ wrap.innerHTML = `<div class="empty">Pick a pay period start date.</div>`; return; }
+  const days = Array.from({length:14}, (_,i)=>addDays(start,i));
+  const names = [...new Set([...employees.map(e=>e.name), ...entries.map(e=>e.employeeName)])].sort((a,b)=>a.localeCompare(b));
+  let html = '';
+  names.forEach(name=>{
+    let totalMs=0, week1Ms=0, week2Ms=0;
+    const dayRows = days.map((d,i)=>{
+      const entry = entries.find(e=>e.employeeName===name && e.date===d);
+      const ms = entry ? entryHoursMs(entry) : 0;
+      totalMs += ms;
+      if(i<7) week1Ms += ms; else week2Ms += ms;
+      return { d, ms };
+    });
+    if(totalMs===0) return;
+    html += `<div class="payroll-page">
+      <div class="ph-name">${escapeHtml(name)}</div>
+      <div class="ph-period">Pay period: ${fmtDateShort(days[0])} \u2013 ${fmtDateShort(days[13])}</div>
+      <table class="report-table"><thead><tr><th>Date</th><th>Day</th><th>Hours</th></tr></thead><tbody>
+        ${dayRows.map(r=>`<tr><td>${fmtDateShort(r.d)}</td><td>${new Date(r.d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'})}</td><td>${r.ms>0?fmtDuration(r.ms):'\u2014'}</td></tr>`).join('')}
+      </tbody></table>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:13px;">
+        <div>Week 1: <b>${fmtDuration(week1Ms)}</b></div>
+        <div>Week 2: <b>${fmtDuration(week2Ms)}</b></div>
+        <div>Total: <b>${fmtDuration(totalMs)}</b></div>
+      </div>
+    </div>`;
+  });
+  wrap.innerHTML = html || `<div class="empty">No hours logged in this period.</div>`;
+}
+
+function printActiveModal(){
+  document.body.classList.add('printing-overlay');
+  window.print();
+  window.onafterprint = ()=>{ document.body.classList.remove('printing-overlay'); };
+  setTimeout(()=>document.body.classList.remove('printing-overlay'), 1000);
 }
 
 /* ============ BACKEND ============ */
@@ -487,9 +837,11 @@ async function loadData(){
     entries = data.entries || [];
     vehicles = (data.vehicles && data.vehicles.length) ? data.vehicles : [...DEFAULT_VEHICLES];
     jobNameList = data.jobNames || [];
-    employees = (data.employees && data.employees.length) ? data.employees : [...DEFAULT_EMPLOYEES];
+    employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, perms:{...e.perms} }));
+    fetchJobTrackerNames();
     findTodayEntry();
     renderToday();
+    renderAdminFooter();
     if(!tickHandle) tickHandle = setInterval(renderToday, 30000);
   }catch(e){
     console.error('load failed', e);
@@ -613,12 +965,13 @@ function jobLogRowsHtml(){
   return `<div class="card"><div class="card-eyebrow">Today's jobs</div>${rows}</div>`;
 }
 function jobDatalistHtml(){
-  return jobNameList.map(n=>`<option value="${escapeHtml(n)}">`).join('');
+  return allJobNames().map(n=>`<option value="${escapeHtml(n)}">`).join('');
 }
 function renderToday(){
   const el = document.getElementById('todayContent');
   const pill = document.getElementById('statusPill');
   document.getElementById('headerDate').textContent = fmtDateLong(todayStr());
+  renderQuote();
   if(!el) return;
 
   // 1. Not clocked in
