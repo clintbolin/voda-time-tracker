@@ -1097,6 +1097,21 @@ function addDays(dateStr, n){
   d.setDate(d.getDate()+n);
   return d.toISOString().slice(0,10);
 }
+// Anyone over 40 hours in a Mon–Sun week earns time-and-a-half on the extra
+// hours. Rather than picking which specific hours "count" as overtime, the
+// premium is blended evenly across every hour that employee worked that
+// week — so a $20/hr employee who works 44 hours gets paid as
+// (40×$20 + 4×$30) ÷ 44 = $21.36/hr on every hour logged that week. This
+// keeps day/job-level dollar figures summing exactly to the true weekly
+// total without needing to arbitrarily assign OT to one job over another.
+function weekEffectiveRate(employeeName, weekMonday, baseRate){
+  if(!baseRate) return 0;
+  const weekEntries = entries.filter(e=>e.employeeName===employeeName && mondayOf(e.date)===weekMonday);
+  const totalHours = weekEntries.reduce((s,e)=>s+entryHoursMs(e),0)/3600000;
+  if(totalHours<=40 || totalHours===0) return baseRate;
+  const regular = 40, ot = totalHours-40;
+  return baseRate * (regular + ot*1.5) / totalHours;
+}
 function openWeeklyReport(){
   document.getElementById('weeklyReportDate').value = todayStr();
   renderWeeklyReport();
@@ -1384,6 +1399,7 @@ function jobLogRowsHtml(){
 // real Job Tracker job (jobTrackerMap has no entry for it), so time logged
 // under it naturally never shows a "Send to Job Tracker" option later.
 const ADMIN_JOB_LABEL = 'Admin';
+const FLOOR_CLEANING_JOB_LABEL = 'Floor Cleaning';
 function renderJobSearchResults(query){
   const box = document.getElementById('jobSearchResults');
   if(!box) return;
@@ -1391,8 +1407,10 @@ function renderJobSearchResults(query){
   const names = allJobNames();
   const matches = q ? names.filter(n=>n.toLowerCase().includes(q)) : names;
   const showAdmin = !q || ADMIN_JOB_LABEL.toLowerCase().includes(q);
+  const showFloor = !q || FLOOR_CLEANING_JOB_LABEL.toLowerCase().includes(q);
   const rows = [];
-  if(showAdmin) rows.push(`<div class="jsr-row jsr-admin" onmousedown="selectJobSearchResult('${ADMIN_JOB_LABEL}')">${ADMIN_JOB_LABEL} (office / no job today)</div>`);
+  if(showAdmin) rows.push(`<div class="jsr-row jsr-admin" onmousedown="selectJobSearchResult('${ADMIN_JOB_LABEL}')">${ADMIN_JOB_LABEL}</div>`);
+  if(showFloor) rows.push(`<div class="jsr-row jsr-admin" onmousedown="selectJobSearchResult('${FLOOR_CLEANING_JOB_LABEL}')">${FLOOR_CLEANING_JOB_LABEL}</div>`);
   matches.slice(0,25).forEach(n=>{
     rows.push(`<div class="jsr-row" onmousedown="selectJobSearchResult('${escapeHtml(n).replace(/'/g,"\\'")}')">${escapeHtml(n)}</div>`);
   });
@@ -1678,20 +1696,22 @@ function renderDetailedLaborReport(){
     let dayMs = 0, dayCost = 0;
     byDate[date].forEach(e=>{
       const emp = employees.find(x=>x.name===e.employeeName);
-      const rate = emp ? (emp.hourlyRate||0) : 0;
+      const baseRate = emp ? (emp.hourlyRate||0) : 0;
+      const rate = weekEffectiveRate(e.employeeName, mondayOf(e.date), baseRate);
+      const otTag = rate>baseRate ? ` <span style="color:var(--amber);font-weight:700;">(OT wk)</span>` : '';
       const totalMs = entryHoursMs(e);
       let attributedMs = 0;
       e.jobLogs.forEach(jl=>{
         const ms = (jl.endedAt?new Date(jl.endedAt):new Date()) - new Date(jl.startedAt);
         attributedMs += ms;
         const cost = ms/3600000*rate;
-        dayRows += `<tr><td>${escapeHtml(e.employeeName)}</td><td>${escapeHtml(jl.jobName)}</td><td>${fmtDuration(ms)}</td><td>$${cost.toFixed(2)}</td></tr>`;
+        dayRows += `<tr><td>${escapeHtml(e.employeeName)}${otTag}</td><td>${escapeHtml(jl.jobName)}</td><td>${fmtDuration(ms)}</td><td>$${cost.toFixed(2)}</td></tr>`;
         dayMs += ms; dayCost += cost;
       });
       const remainderMs = totalMs - attributedMs;
       if(remainderMs > 60000){
         const cost = remainderMs/3600000*rate;
-        dayRows += `<tr><td>${escapeHtml(e.employeeName)}</td><td style="color:var(--muted);">Shop / Unassigned</td><td>${fmtDuration(remainderMs)}</td><td>$${cost.toFixed(2)}</td></tr>`;
+        dayRows += `<tr><td>${escapeHtml(e.employeeName)}${otTag}</td><td style="color:var(--muted);">Shop / Unassigned</td><td>${fmtDuration(remainderMs)}</td><td>$${cost.toFixed(2)}</td></tr>`;
         dayMs += remainderMs; dayCost += cost;
       }
     });
@@ -1724,18 +1744,24 @@ function renderJobReport(){
   if(!jobName){ wrap.innerHTML = `<div class="empty">Choose a job to see who worked it.</div>`; return; }
   const letterhead = reportLetterheadHtml(`Job Report &mdash; ${escapeHtml(jobName)}`);
   let sessionRows = [];
-  const perEmp = {}; // name -> { totalMs, unsyncedMs, jobId }
+  const perEmp = {}; // name -> { totalMs, unsyncedMs, unsyncedCost, jobId }
   let grandTotal = 0;
   entries.forEach(e=>{
     if(from && e.date<from) return;
     if(to && e.date>to) return;
+    const emp = employees.find(x=>x.name===e.employeeName);
+    const baseRate = emp ? (emp.hourlyRate||0) : 0;
+    const weekRate = weekEffectiveRate(e.employeeName, mondayOf(e.date), baseRate);
     e.jobLogs.forEach(jl=>{
       if(jl.jobName.toLowerCase()!==jobName.toLowerCase()) return;
       const ms = (jl.endedAt?new Date(jl.endedAt):new Date()) - new Date(jl.startedAt);
       sessionRows.push({ date:e.date, name:e.employeeName, start:jl.startedAt, end:jl.endedAt, ms, synced:!!jl.syncedToJobTracker, jobId:jl.jobId||null });
-      if(!perEmp[e.employeeName]) perEmp[e.employeeName] = { totalMs:0, unsyncedMs:0, jobId:jl.jobId||null };
+      if(!perEmp[e.employeeName]) perEmp[e.employeeName] = { totalMs:0, unsyncedMs:0, unsyncedCost:0, jobId:jl.jobId||null };
       perEmp[e.employeeName].totalMs += ms;
-      if(!jl.syncedToJobTracker) perEmp[e.employeeName].unsyncedMs += ms;
+      if(!jl.syncedToJobTracker){
+        perEmp[e.employeeName].unsyncedMs += ms;
+        perEmp[e.employeeName].unsyncedCost += (ms/3600000) * weekRate;
+      }
       if(jl.jobId) perEmp[e.employeeName].jobId = jl.jobId;
       grandTotal += ms;
     });
@@ -1749,13 +1775,10 @@ function renderJobReport(){
   const perEmpTable = `<table class="report-table"><thead><tr><th>Employee</th><th>Total</th><th>Not yet sent</th><th></th></tr></thead><tbody>
     ${empNames.map(n=>{
       const row = perEmp[n];
-      const emp = employees.find(e=>e.name===n);
-      const rate = emp ? (emp.hourlyRate||0) : 0;
-      const canSend = row.unsyncedMs>0 && row.jobId;
       let sendBtn;
       if(row.unsyncedMs===0) sendBtn = `<span style="color:var(--muted);font-size:11.5px;">All sent</span>`;
       else if(!row.jobId) sendBtn = `<span style="color:var(--muted);font-size:11.5px;">Not a Job Tracker job</span>`;
-      else sendBtn = `<button class="chip-sm" style="cursor:pointer;background:var(--gold-light);color:var(--black);" onclick="sendLaborToJobTracker('${escapeHtml(n).replace(/'/g,"\\'")}','${escapeHtml(jobName).replace(/'/g,"\\'")}',${row.jobId ? `'${row.jobId}'` : 'null'},${row.unsyncedMs},${rate})">Send ${fmtDuration(row.unsyncedMs)} ($${(row.unsyncedMs/3600000*rate).toFixed(2)})</button>`;
+      else sendBtn = `<button class="chip-sm" style="cursor:pointer;background:var(--gold-light);color:var(--black);" onclick="sendLaborToJobTracker('${escapeHtml(n).replace(/'/g,"\\'")}','${escapeHtml(jobName).replace(/'/g,"\\'")}',${row.jobId ? `'${row.jobId}'` : 'null'},${row.unsyncedMs},${row.unsyncedCost})">Send ${fmtDuration(row.unsyncedMs)} ($${row.unsyncedCost.toFixed(2)})</button>`;
       return `<tr><td>${escapeHtml(n)}</td><td>${fmtDuration(row.totalMs)}</td><td>${row.unsyncedMs>0?fmtDuration(row.unsyncedMs):'—'}</td><td>${sendBtn}</td></tr>`;
     }).join('')}
   </tbody></table>`;
@@ -1765,20 +1788,19 @@ function renderJobReport(){
     <div class="card-eyebrow" style="margin-top:16px;">Total per employee &amp; send to Job Tracker</div>
     ${perEmpTable}
     <div class="hint" style="margin-top:12px;font-weight:700;color:var(--ink);">Grand total (all employees): ${fmtDuration(grandTotal)}</div>
-    <div class="hint">Sends only the hours not already sent, as one Mitigation labor cost entry using that employee's hourly rate (set in Manage Employees).</div>`;
+    <div class="hint">Sends only the hours not already sent, as one Mitigation labor cost entry using that employee's hourly rate — automatically bumped to time-and-a-half for any hours over 40 in that employee's week (set base rate in Manage Employees).</div>`;
 }
-async function sendLaborToJobTracker(employeeName, jobName, jobId, unsyncedMs, rate){
+async function sendLaborToJobTracker(employeeName, jobName, jobId, unsyncedMs, amount){
   if(!jobId){ showToast("This job isn't linked to Job Tracker"); return; }
-  const hours = unsyncedMs/3600000;
-  const amount = Math.round(hours*rate*100)/100;
-  if(rate<=0){
+  amount = Math.round(amount*100)/100;
+  if(amount<=0){
     if(!confirm(`${employeeName} has no hourly rate set (in Manage Employees), so this would send $0.00 for ${fmtDuration(unsyncedMs)}. Send anyway?`)) return;
-  } else if(!confirm(`Send ${fmtDuration(unsyncedMs)} of ${employeeName}'s time on "${jobName}" to Job Tracker as a Mitigation labor cost of $${amount.toFixed(2)} (${hours.toFixed(2)}h \u00d7 $${rate}/hr)?`)){
+  } else if(!confirm(`Send ${fmtDuration(unsyncedMs)} of ${employeeName}'s time on "${jobName}" to Job Tracker as a Mitigation labor cost of $${amount.toFixed(2)} (includes any overtime premium this week)?`)){
     return;
   }
   showToast('Sending to Job Tracker…');
   try{
-    const note = `Time Tracker \u2014 ${employeeName}, ${fmtDuration(unsyncedMs)} (sent ${fmtDateShort(todayStr())})`;
+    const note = employeeName;
     await pushLaborCostToJobTracker(jobId, employeeName, amount, note);
     const now = nowIso();
     entries.forEach(e=>{
