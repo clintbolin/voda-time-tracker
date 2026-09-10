@@ -953,6 +953,47 @@ async function pushLaborCostToJobTracker(jobId, employeeName, amount, note){
   const postData = await postRes.json().catch(()=>({}));
   if(postData && postData.error) throw new Error(postData.error);
 }
+// Fires when an employee clocks out (including each time, if they're called
+// back in later and clock out again) — not the instant each job ends. This
+// leaves a same-day window where admin can fix a forgotten job log or a
+// mistimed clock-in/out via Adjust Time Entries before anything reaches Job
+// Tracker. Because overtime is a WEEKLY calculation, an earlier day this
+// week might have synced at straight time and then the week crosses 40
+// hours later — so this re-checks every already-synced session that
+// employee logged this same week and tops each one up to the now-correct
+// blended rate, appending a small adjustment line rather than editing
+// history. On any failure a session is simply left as-is; it still shows a
+// Send button in the Job Report as a fallback, so nothing is ever silently
+// lost.
+async function autoSyncEmployeeWeek(employeeName, weekMonday){
+  const emp = employees.find(x=>x.name===employeeName);
+  const baseRate = emp ? (emp.hourlyRate||0) : 0;
+  if(baseRate<=0) return;
+  const weekRate = weekEffectiveRate(employeeName, weekMonday, baseRate);
+  const weekEntries = entries.filter(e=>e.employeeName===employeeName && mondayOf(e.date)===weekMonday);
+  let anyChanged = false;
+  for(const entry of weekEntries){
+    for(const jl of entry.jobLogs){
+      if(!jl.jobId || !jl.endedAt) continue; // only finished sessions tied to a real Job Tracker job
+      const ms = new Date(jl.endedAt) - new Date(jl.startedAt);
+      const correctAmount = Math.round((ms/3600000)*weekRate*100)/100;
+      const already = jl.syncedAmount||0;
+      const delta = Math.round((correctAmount-already)*100)/100;
+      if(Math.abs(delta) < 0.01) continue;
+      try{
+        const note = jl.syncedToJobTracker ? `${employeeName} (OT true-up)` : employeeName;
+        await pushLaborCostToJobTracker(jl.jobId, employeeName, delta, note);
+        jl.syncedToJobTracker = true;
+        jl.syncedAmount = correctAmount;
+        jl.syncedAt = nowIso();
+        anyChanged = true;
+      }catch(e){
+        console.warn('Auto-sync to Job Tracker failed for a session — it stays available to send manually from the Job Report:', e);
+      }
+    }
+  }
+  if(anyChanged) saveEntries();
+}
 function allJobNames(){
   return [...new Set([...jobTrackerNames, ...jobNameList])].sort((a,b)=>a.localeCompare(b));
 }
@@ -1379,6 +1420,7 @@ function clockOut(){
   const current = shifts[shifts.length-1];
   current.clockOutAt = nowIso();
   persistToday();
+  autoSyncEmployeeWeek(todayEntry.employeeName, mondayOf(todayEntry.date));
   renderToday();
   showToast('Clocked out — see you next time!');
 }
@@ -1755,12 +1797,15 @@ function renderJobReport(){
     e.jobLogs.forEach(jl=>{
       if(jl.jobName.toLowerCase()!==jobName.toLowerCase()) return;
       const ms = (jl.endedAt?new Date(jl.endedAt):new Date()) - new Date(jl.startedAt);
-      sessionRows.push({ date:e.date, name:e.employeeName, start:jl.startedAt, end:jl.endedAt, ms, synced:!!jl.syncedToJobTracker, jobId:jl.jobId||null });
+      const correctAmount = jl.endedAt ? (ms/3600000)*weekRate : 0; // sessions still in progress aren't sendable yet
+      const owed = Math.max(0, correctAmount - (jl.syncedAmount||0));
+      const isSynced = !!jl.endedAt && owed<0.01;
+      sessionRows.push({ date:e.date, name:e.employeeName, start:jl.startedAt, end:jl.endedAt, ms, synced:isSynced, jobId:jl.jobId||null });
       if(!perEmp[e.employeeName]) perEmp[e.employeeName] = { totalMs:0, unsyncedMs:0, unsyncedCost:0, jobId:jl.jobId||null };
       perEmp[e.employeeName].totalMs += ms;
-      if(!jl.syncedToJobTracker){
+      if(!isSynced && jl.endedAt){
         perEmp[e.employeeName].unsyncedMs += ms;
-        perEmp[e.employeeName].unsyncedCost += (ms/3600000) * weekRate;
+        perEmp[e.employeeName].unsyncedCost += owed;
       }
       if(jl.jobId) perEmp[e.employeeName].jobId = jl.jobId;
       grandTotal += ms;
@@ -1788,7 +1833,7 @@ function renderJobReport(){
     <div class="card-eyebrow" style="margin-top:16px;">Total per employee &amp; send to Job Tracker</div>
     ${perEmpTable}
     <div class="hint" style="margin-top:12px;font-weight:700;color:var(--ink);">Grand total (all employees): ${fmtDuration(grandTotal)}</div>
-    <div class="hint">Sends only the hours not already sent, as one Mitigation labor cost entry using that employee's hourly rate — automatically bumped to time-and-a-half for any hours over 40 in that employee's week (set base rate in Manage Employees).</div>`;
+    <div class="hint">Time is now sent to Job Tracker automatically when each employee clocks out, including overtime true-ups — this is mainly a backup in case that ever fails to go through.</div>`;
 }
 async function sendLaborToJobTracker(employeeName, jobName, jobId, unsyncedMs, amount){
   if(!jobId){ showToast("This job isn't linked to Job Tracker"); return; }
@@ -1802,13 +1847,19 @@ async function sendLaborToJobTracker(employeeName, jobName, jobId, unsyncedMs, a
   try{
     const note = employeeName;
     await pushLaborCostToJobTracker(jobId, employeeName, amount, note);
-    const now = nowIso();
     entries.forEach(e=>{
       if(e.employeeName!==employeeName) return;
+      const emp = employees.find(x=>x.name===employeeName);
+      const baseRate = emp ? (emp.hourlyRate||0) : 0;
+      const weekRate = weekEffectiveRate(employeeName, mondayOf(e.date), baseRate);
       e.jobLogs.forEach(jl=>{
-        if(jl.jobName.toLowerCase()===jobName.toLowerCase() && jl.jobId===jobId && !jl.syncedToJobTracker){
+        if(jl.jobName.toLowerCase()!==jobName.toLowerCase() || jl.jobId!==jobId || !jl.endedAt) return;
+        const ms = new Date(jl.endedAt) - new Date(jl.startedAt);
+        const correctAmount = Math.round((ms/3600000)*weekRate*100)/100;
+        if(correctAmount - (jl.syncedAmount||0) >= 0.01){
           jl.syncedToJobTracker = true;
-          jl.syncedAt = now;
+          jl.syncedAmount = correctAmount;
+          jl.syncedAt = nowIso();
         }
       });
     });
