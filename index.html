@@ -1696,7 +1696,7 @@ function renderToday(){
   // 3. On the road (idle between jobs, or actively on a job) — Post-Trip not started yet
   if(!todayEntry.returnedToShopAt){
     const active = activeJobLog();
-    if(active && active.jobName===ADMIN_JOB_LABEL && todayEntry.vehicle==='No Vehicle'){
+    if(active && active.jobName.trim().toLowerCase()===ADMIN_JOB_LABEL.toLowerCase()){
       pill.textContent = 'On the clock';
       pill.className = 'status-pill on';
       const elapsed = fmtDuration(new Date() - new Date(active.startedAt));
