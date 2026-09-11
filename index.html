@@ -692,7 +692,7 @@ function boot(){
 }
 function proceedPastPin(){
   const saved = localStorage.getItem(EMP_STORAGE_KEY);
-  if(saved && employees.some(e=>e.name===saved)){
+  if(saved && employees.some(e=>e.name===saved && !e.archived)){
     selectEmployee(saved, true);
   } else {
     showEmployeePicker();
@@ -721,7 +721,7 @@ function headerLogoSrc(){
 function showEmployeePicker(){
   const box = document.getElementById('authGateBox');
   const logoImg = `<img class="gate-logo" src="${headerLogoSrc()}" alt="Voda">`;
-  const sorted = [...employees].sort((a,b)=>a.name.localeCompare(b.name));
+  const sorted = employees.filter(e=>!e.archived).sort((a,b)=>a.name.localeCompare(b.name));
   box.innerHTML = `${logoImg}<h2>Who's clocking in?</h2>
     <div style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;margin-bottom:14px;">
       ${sorted.map(e=>`<button class="btn btn-ghost" style="justify-content:flex-start;" onclick="confirmSignIn('${e.name.replace(/'/g,"\\'")}')">${escapeHtml(e.name)}</button>`).join('')}
@@ -794,45 +794,65 @@ function renderAdminFooter(){
 /* ============ MANAGE EMPLOYEES (draft + explicit Save/Cancel) ============ */
 let employeesDraft = null;
 function openManageEmployees(){
-  employeesDraft = employees.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
+  employeesDraft = employees.map(e=>({ name:e.name, _origName:e.name, hourlyRate:e.hourlyRate||0, archived:!!e.archived, perms:{...e.perms} }));
   renderEmployeeList();
   document.getElementById('employeeNameInput').value = '';
   openModal('modalEmployees');
 }
 function renderEmployeeList(){
   const wrap = document.getElementById('employeeList');
-  const sorted = [...employeesDraft].sort((a,b)=>a.name.localeCompare(b.name));
-  if(sorted.length===0){ wrap.innerHTML = `<div class="empty">No employees yet.</div>`; return; }
-  wrap.innerHTML = sorted.map(emp=>{
+  const active = employeesDraft.filter(e=>!e.archived).sort((a,b)=>a.name.localeCompare(b.name));
+  const archived = employeesDraft.filter(e=>e.archived).sort((a,b)=>a.name.localeCompare(b.name));
+  const rowHtml = (emp) => {
     const p = emp.perms || {};
-    const nameEsc = escapeHtml(emp.name).replace(/'/g,"\\'");
+    const key = escapeHtml(emp._origName).replace(/'/g,"\\'");
     return `<div class="list-row" style="flex-direction:column;align-items:stretch;gap:9px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div class="nm">${escapeHtml(emp.name)}</div>
-        <button class="del-btn" onclick="removeEmployeeDraft('${nameEsc}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input value="${escapeHtml(emp.name)}" style="flex:1;font-weight:700;padding:7px 9px;border:1.5px solid var(--line);border-radius:8px;" onchange="setDraftName('${key}',this.value)">
+        <button class="del-btn" title="Archive" onclick="archiveEmployeeDraft('${key}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg></button>
       </div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
         <span>Hourly rate $</span>
-        <input type="number" min="0" step="0.01" value="${emp.hourlyRate||''}" placeholder="0.00" style="width:80px;padding:5px 7px;border:1.5px solid var(--line);border-radius:7px;font-size:12px;" onchange="setDraftRate('${nameEsc}',this.value)">
+        <input type="number" min="0" step="0.01" value="${emp.hourlyRate||''}" placeholder="0.00" style="width:80px;padding:5px 7px;border:1.5px solid var(--line);border-radius:7px;font-size:12px;" onchange="setDraftRate('${key}',this.value)">
         <span style="color:var(--muted);">— used when sending hours to Job Tracker</span>
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);">
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.vehicles?'checked':''} onchange="setDraftPermission('${nameEsc}','vehicles',this.checked)"> Vehicles</label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.jobs?'checked':''} onchange="setDraftPermission('${nameEsc}','jobs',this.checked)"> Job list</label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.employees?'checked':''} onchange="setDraftPermission('${nameEsc}','employees',this.checked)"> Employees</label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.reports?'checked':''} onchange="setDraftPermission('${nameEsc}','reports',this.checked)"> Reports</label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.adjustTimes?'checked':''} onchange="setDraftPermission('${nameEsc}','adjustTimes',this.checked)"> Adjust times</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.vehicles?'checked':''} onchange="setDraftPermission('${key}','vehicles',this.checked)"> Vehicles</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.jobs?'checked':''} onchange="setDraftPermission('${key}','jobs',this.checked)"> Job list</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.employees?'checked':''} onchange="setDraftPermission('${key}','employees',this.checked)"> Employees</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.reports?'checked':''} onchange="setDraftPermission('${key}','reports',this.checked)"> Reports</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.adjustTimes?'checked':''} onchange="setDraftPermission('${key}','adjustTimes',this.checked)"> Adjust times</label>
       </div>
     </div>`;
-  }).join('');
+  };
+  let html = active.length ? active.map(rowHtml).join('') : `<div class="empty">No active employees.</div>`;
+  if(archived.length){
+    html += `<div class="card-eyebrow" style="margin-top:16px;">Archived (${archived.length})</div>`;
+    html += archived.map(emp=>{
+      const key = escapeHtml(emp._origName).replace(/'/g,"\\'");
+      return `<div class="list-row" style="justify-content:space-between;">
+        <div class="nm" style="color:var(--muted);">${escapeHtml(emp.name)}</div>
+        <div style="display:flex;gap:8px;">
+          <button class="chip-sm" style="cursor:pointer;" onclick="restoreEmployeeDraft('${key}')">Restore</button>
+          <button class="chip-sm" style="cursor:pointer;background:var(--red-bg);color:var(--red);" onclick="deleteEmployeeDraftPermanently('${key}')">Delete Permanently</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  wrap.innerHTML = html;
 }
-function setDraftRate(name, val){
-  const emp = employeesDraft.find(e=>e.name===name);
+function setDraftName(origName, val){
+  const emp = employeesDraft.find(e=>e._origName===origName);
+  if(!emp) return;
+  emp.name = val;
+}
+function setDraftRate(origName, val){
+  const emp = employeesDraft.find(e=>e._origName===origName);
   if(!emp) return;
   emp.hourlyRate = Math.max(0, Number(val)||0);
 }
-function setDraftPermission(name, key, val){
-  const emp = employeesDraft.find(e=>e.name===name);
+function setDraftPermission(origName, key, val){
+  const emp = employeesDraft.find(e=>e._origName===origName);
   if(!emp) return;
   if(!emp.perms) emp.perms = {vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false};
   emp.perms[key] = val;
@@ -842,13 +862,28 @@ function confirmAddEmployee(){
   const name = input.value.trim();
   if(!name){ showToast('Enter a name'); return; }
   if(employeesDraft.some(e=>e.name.toLowerCase()===name.toLowerCase())){ showToast('Already on the list'); input.value=''; return; }
-  employeesDraft.push({ name, hourlyRate:0, perms:{vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false} });
+  employeesDraft.push({ name, _origName:name, hourlyRate:0, archived:false, perms:{vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false} });
   input.value='';
   renderEmployeeList();
 }
-function removeEmployeeDraft(name){
-  if(!confirm(`Remove ${name} from the employee list? This won't take effect until you tap Save Changes, and it doesn't delete their past time entries.`)) return;
-  employeesDraft = employeesDraft.filter(e=>e.name!==name);
+function archiveEmployeeDraft(origName){
+  const emp = employeesDraft.find(e=>e._origName===origName);
+  if(!emp) return;
+  if(!confirm(`Archive ${emp.name}? They won't be able to clock in anymore, but all their past time entries stay intact. You can restore them anytime.`)) return;
+  emp.archived = true;
+  renderEmployeeList();
+}
+function restoreEmployeeDraft(origName){
+  const emp = employeesDraft.find(e=>e._origName===origName);
+  if(!emp) return;
+  emp.archived = false;
+  renderEmployeeList();
+}
+function deleteEmployeeDraftPermanently(origName){
+  const emp = employeesDraft.find(e=>e._origName===origName);
+  if(!emp) return;
+  if(!confirm(`Permanently delete ${emp.name} from the employee list? This can't be undone. Their past time entries stay in your records, but they'll no longer appear anywhere in employee lists — consider Restore instead if you're not sure.`)) return;
+  employeesDraft = employeesDraft.filter(e=>e._origName!==origName);
   renderEmployeeList();
 }
 function cancelEmployeeEdits(){
@@ -857,13 +892,26 @@ function cancelEmployeeEdits(){
 }
 let employeeSaveInFlight = false;
 async function saveEmployeeEdits(){
-  if(!employeesDraft || employeeSaveInFlight) return; // guards against a double-tap firing this twice
+  if(!employeesDraft || employeeSaveInFlight) return;
+  const names = employeesDraft.map(e=>e.name.trim().toLowerCase()).filter(Boolean);
+  if(new Set(names).size !== names.length){ showToast('Two employees have the same name — please make each name unique before saving.'); return; }
+  if(employeesDraft.some(e=>!e.name.trim())){ showToast('Every employee needs a name'); return; }
   if(!confirm('Save these changes to the employee list and permissions?')) return;
   employeeSaveInFlight = true;
-  const draftCopy = employeesDraft.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
+  // Cascade any renames to historical time entries so past days stay attributed correctly
+  let anyRenamed = false;
+  employeesDraft.forEach(e=>{
+    const newName = e.name.trim();
+    if(e._origName && e._origName !== newName){
+      entries.forEach(en=>{ if(en.employeeName===e._origName) en.employeeName = newName; });
+      anyRenamed = true;
+    }
+  });
+  const draftCopy = employeesDraft.map(e=>({ name:e.name.trim(), hourlyRate:e.hourlyRate||0, archived:!!e.archived, perms:{...e.perms} }));
   employeesDraft = null;
   employees = draftCopy;
   const ok = await saveEmployees();
+  if(ok && anyRenamed) await saveEntries();
   employeeSaveInFlight = false;
   if(ok){ showToast('Employee changes saved'); renderAdminFooter(); closeModal('modalEmployees'); }
 }
@@ -1066,6 +1114,81 @@ function ensureShifts(entry){
 function entryHoursMs(entry){
   const shifts = ensureShifts(entry);
   return shifts.reduce((sum,s)=> sum + ((s.clockOutAt?new Date(s.clockOutAt):new Date()) - new Date(s.clockInAt)), 0);
+}
+
+/* ============ LONG-SHIFT WARNINGS (9h mild, 11h moderate, 12h stern) ============ */
+// Tracks which thresholds have already been warned for the CURRENT open
+// entry, so each one only fires once per day rather than every 30-second
+// re-render. Resets automatically when the entry changes (new day/employee).
+let hourWarningState = { entryId: null, warned9:false, warned11:false, warned12:false };
+function playBeep(frequency, duration){
+  try{
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration/1000);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration/1000 + 0.05);
+    osc.onended = () => ctx.close();
+  }catch(e){ /* audio not available — the visual warning still shows */ }
+}
+let alarmLoopHandle = null;
+function playAlarmLoop(){
+  stopAlarmLoop();
+  playBeep(880,350);
+  alarmLoopHandle = setInterval(()=>{ playBeep(880,350); setTimeout(()=>playBeep(880,350), 450); }, 1400);
+}
+function stopAlarmLoop(){
+  if(alarmLoopHandle){ clearInterval(alarmLoopHandle); alarmLoopHandle = null; }
+}
+function checkHourWarnings(){
+  if(!todayEntry) return;
+  if(hourWarningState.entryId !== todayEntry.id){
+    hourWarningState = { entryId: todayEntry.id, warned9:false, warned11:false, warned12:false };
+  }
+  // Don't nag once the day is already closed out — only while actively on the clock.
+  const shifts = ensureShifts(todayEntry);
+  const stillOn = shifts.length && !shifts[shifts.length-1].clockOutAt;
+  if(!stillOn) return;
+  const hours = entryHoursMs(todayEntry)/3600000;
+  if(hours>=12 && !hourWarningState.warned12){
+    hourWarningState.warned12 = true;
+    showSternWarning();
+  } else if(hours>=11 && !hourWarningState.warned11){
+    hourWarningState.warned11 = true;
+    playBeep(660,200);
+    showToast("You've been on the clock over 11 hours.");
+  } else if(hours>=9 && !hourWarningState.warned9){
+    hourWarningState.warned9 = true;
+    playBeep(520,180);
+    showToast("You've been on the clock over 9 hours.");
+  }
+}
+function showSternWarning(){
+  playAlarmLoop();
+  if(document.getElementById('sternWarningOverlay')) return;
+  const box = document.createElement('div');
+  box.id = 'sternWarningOverlay';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  box.innerHTML = `<div style="background:var(--card);border-radius:16px;padding:28px 22px;max-width:360px;width:100%;text-align:center;">
+    <div style="font-size:40px;margin-bottom:8px;">⚠️</div>
+    <div style="font-size:19px;font-weight:800;color:var(--red);margin-bottom:8px;">12+ Hours on the Clock</div>
+    <div style="font-size:14px;color:var(--muted);margin-bottom:22px;">Please contact management for approval before continuing to work past 12 hours today.</div>
+    <button class="btn btn-red" onclick="acknowledgeSternWarning()">I Understand</button>
+  </div>`;
+  document.body.appendChild(box);
+}
+function acknowledgeSternWarning(){
+  stopAlarmLoop();
+  const el = document.getElementById('sternWarningOverlay');
+  if(el) el.remove();
 }
 function entryStatusText(entry){
   if(!entry.preTripAt) return 'Pre-Trip pending';
@@ -1409,6 +1532,16 @@ function returnToShop(){
   renderToday();
   showToast('Logged — heading back to the shop');
 }
+// One-tap end of day for office/Admin staff — closes the job, skips Post-Trip
+// (there's no vehicle to check), and clocks out, all in a single button.
+function adminClockOut(){
+  const active = activeJobLog();
+  if(active) active.endedAt = nowIso();
+  todayEntry.returnedToShopAt = nowIso();
+  todayEntry.postTripChecks = { clean:false, gas:false, notApplicable:true };
+  todayEntry.postTripAt = nowIso();
+  clockOut();
+}
 function confirmPostTrip(){
   const clean = document.getElementById('postTripClean').checked;
   const gas = document.getElementById('postTripGas').checked;
@@ -1501,6 +1634,7 @@ function renderToday(){
       </div>`;
     return;
   }
+  checkHourWarnings();
 
   const shifts = ensureShifts(todayEntry);
   const currentShift = shifts[shifts.length-1];
@@ -1562,6 +1696,21 @@ function renderToday(){
   // 3. On the road (idle between jobs, or actively on a job) — Post-Trip not started yet
   if(!todayEntry.returnedToShopAt){
     const active = activeJobLog();
+    if(active && active.jobName===ADMIN_JOB_LABEL && todayEntry.vehicle==='No Vehicle'){
+      pill.textContent = 'On the clock';
+      pill.className = 'status-pill on';
+      const elapsed = fmtDuration(new Date() - new Date(active.startedAt));
+      el.innerHTML = `
+        <div class="card" style="text-align:center;">
+          <div class="timer-box">
+            <div class="job-name">${ADMIN_JOB_LABEL}</div>
+            <div class="job-since">Since ${fmtTime(active.startedAt)}</div>
+            <div class="job-elapsed">${elapsed}</div>
+          </div>
+          <button class="btn btn-red" onclick="adminClockOut()">Clock Out</button>
+        </div>`;
+      return;
+    }
     if(active){
       pill.textContent = 'On the clock';
       pill.className = 'status-pill on';
@@ -1933,7 +2082,9 @@ function renderAdjustForm(){
       </div>
     </div>`).join('');
   wrap.innerHTML = `
-    <div class="card-eyebrow">Shifts</div>
+    <div class="field"><label>Entry date</label><input type="date" value="${adjustDraft.date}" onchange="adjustDraft.date=this.value"></div>
+    <div class="hint" style="margin-top:-8px;">Change this to move this whole day's entry to a different date (backdate a missed clock-in, fix a wrong day, etc.).</div>
+    <div class="card-eyebrow" style="margin-top:14px;">Shifts</div>
     ${shiftsHtml || '<div class="empty">No shifts.</div>'}
     <div class="card-eyebrow" style="margin-top:14px;">Job logs (blank end = still in progress)</div>
     ${jobsHtml || '<div class="empty">No jobs logged.</div>'}
@@ -1973,6 +2124,8 @@ async function deleteAdjustEntireEntry(){
 let adjustSaveInFlight = false;
 async function saveAdjustTimes(){
   if(!adjustDraft || adjustSaveInFlight) return;
+  const conflict = entries.find(e=>e.id!==adjustDraft.id && e.employeeName.toLowerCase()===adjustDraft.employeeName.toLowerCase() && e.date===adjustDraft.date);
+  if(conflict){ showToast(`${adjustDraft.employeeName} already has a separate entry on ${fmtDateShort(adjustDraft.date)} — delete or move that one first.`); return; }
   if(!confirm("Save these time adjustments? This directly changes the employee's recorded hours.")) return;
   adjustSaveInFlight = true;
   const idx = entries.findIndex(e=>e.id===adjustDraft.id);
