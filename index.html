@@ -654,6 +654,13 @@ function closeModal(id){
 
 /* ============ AUTH (Google Sign-In + approval + roles) — same pattern as Job Tracker ============ */
 /* ============ EMPLOYEE SIGN-IN (simple name picker) ============ */
+// Deliberately localStorage, not sessionStorage: on a home-screen-installed
+// app, phones (especially iPhones) frequently kill the backgrounded app to
+// save memory, and reopening it then counts as a brand new "session" —
+// which would wipe a sessionStorage flag and kick people back to the PIN
+// screen randomly, even though nothing is actually wrong. localStorage
+// survives that, so the PIN only needs re-entering when it's actually
+// changed (see confirmChangeLoginPin).
 const PIN_UNLOCK_KEY = 'vodaTimeTrackerPinUnlocked';
 const DEFAULT_LOGIN_PIN = '1234';
 async function loadInitialData(){
@@ -674,7 +681,9 @@ async function loadInitialData(){
 function boot(){
   document.getElementById('authGateBox').innerHTML = `<div class="gate-spinner"></div>`;
   loadInitialData().then(()=>{
-    if(sessionStorage.getItem(PIN_UNLOCK_KEY) === 'true'){
+    const unlockedWith = localStorage.getItem(PIN_UNLOCK_KEY);
+    const currentPin = settings.loginPin || DEFAULT_LOGIN_PIN;
+    if(unlockedWith && unlockedWith === currentPin){
       proceedPastPin();
     } else {
       showPinGate();
@@ -702,7 +711,7 @@ function confirmLoginPin(){
   const pin = input.value.trim();
   const correct = settings.loginPin || DEFAULT_LOGIN_PIN;
   if(pin !== correct){ showToast('Incorrect PIN'); input.value=''; return; }
-  sessionStorage.setItem(PIN_UNLOCK_KEY, 'true');
+  localStorage.setItem(PIN_UNLOCK_KEY, pin);
   proceedPastPin();
 }
 function headerLogoSrc(){
