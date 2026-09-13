@@ -399,11 +399,12 @@ main.content{padding:16px 14px 4px;}
 
   <div class="help-section">
     <div class="help-h"><span class="num">2</span>A normal work day</div>
-    <div class="help-step"><div class="n">1</div><div><div class="t">Clock In</div><div class="d">Tap it the moment you start — this is what starts your paid time.</div></div></div>
-    <div class="help-step"><div class="n">2</div><div><div class="t">Pre-Trip</div><div class="d">Pick your vehicle, confirm the inspection, and confirm you've signed the paper sheet. Working from the office all day with no vehicle? Choose "No Vehicle" to skip straight to the next step.</div></div></div>
-    <div class="help-step"><div class="n">3</div><div><div class="t">Log every job you head to</div><div class="d">Search the job by name and tap "I'm heading there." Office day? Choose Admin at the top of the list. Cleaning floors? Choose Floor Cleaning. You can switch jobs as many times as you need during the day.</div></div></div>
-    <div class="help-step"><div class="n">4</div><div><div class="t">Back to the shop</div><div class="d">Called back in later? The app offers "Clock Back In" — no need to redo your Pre-Trip.</div></div></div>
-    <div class="help-step"><div class="n">5</div><div><div class="t">Post-Trip &amp; Clock Out</div><div class="d">Confirm the vehicle's clean and fueled, confirm your paper sheet, then Clock Out. On Admin? It's just one Clock Out button — no vehicle steps at all.</div></div></div>
+    <div class="help-p">Your day looks different depending on your job title (set by your manager in Manage Employees) — <b>Operations</b> or <b>Admin</b>.</div>
+    <div class="help-step"><div class="n">1</div><div><div class="t">Clock In</div><div class="d">Tap it the moment you start — this is what starts your paid time. If your job title is Admin, that's it — you're on the clock with nothing else to fill out, and a Clock Out button is waiting whenever your shift ends.</div></div></div>
+    <div class="help-step"><div class="n">2</div><div><div class="t">Pre-Trip (Operations only)</div><div class="d">Pick your vehicle, confirm the inspection, and confirm you've signed the paper sheet. No vehicle today? Choose "No Vehicle" to skip straight to the next step.</div></div></div>
+    <div class="help-step"><div class="n">3</div><div><div class="t">Log every job you head to (Operations only)</div><div class="d">Search the job by name and tap "I'm heading there." Cleaning floors instead of a job? Choose Floor Cleaning. You can switch jobs as many times as you need during the day.</div></div></div>
+    <div class="help-step"><div class="n">4</div><div><div class="t">Back to the shop (Operations only)</div><div class="d">Called back in later? The app offers "Clock Back In" — no need to redo your Pre-Trip.</div></div></div>
+    <div class="help-step"><div class="n">5</div><div><div class="t">Post-Trip &amp; Clock Out (Operations only)</div><div class="d">Confirm the vehicle's clean and fueled, confirm your paper sheet, then Clock Out.</div></div></div>
   </div>
 
   <div class="help-section">
@@ -719,15 +720,15 @@ updateThemeToggleIcon();
 // checked, they never see the "Admin" link at all.
 const EMP_STORAGE_KEY = 'vodaTimeTrackerEmployee';
 const DEFAULT_EMPLOYEES = [
-  { name:"Clint Bolin", hourlyRate:0, perms:{ vehicles:true, jobs:true, employees:true, reports:true, adjustTimes:true } },
-  { name:"Cruz", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
-  { name:"Angela Hupp", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
-  { name:"Alyssa Miles", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
-  { name:"Julia Couch", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
-  { name:"Arturo Hoyos", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
-  { name:"Joe", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
-  { name:"Daniel", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
-  { name:"Miguel Perez", hourlyRate:0, perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } }
+  { name:"Clint Bolin", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:true, jobs:true, employees:true, reports:true, adjustTimes:true } },
+  { name:"Cruz", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Angela Hupp", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Alyssa Miles", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Julia Couch", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Arturo Hoyos", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Joe", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Daniel", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
+  { name:"Miguel Perez", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } }
 ];
 let currentUser = null; // { name }
 
@@ -743,7 +744,7 @@ let entries = [];      // all employees' day entries
 let vehicles = [...DEFAULT_VEHICLES];
 let jobNameList = [];  // manually managed fallback/supplement job names
 let jobTrackerNames = []; // fetched live from Job Tracker
-let employees = DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
+let employees = DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, jobTitle:e.jobTitle||'Operations', perms:{...e.perms} }));
 let settings = { loginPin: '1234' };
 let auditLog = [];
 let signoffs = [];
@@ -816,7 +817,7 @@ async function loadInitialData(){
     entries = data.entries || [];
     vehicles = (data.vehicles && data.vehicles.length) ? data.vehicles : [...DEFAULT_VEHICLES];
     jobNameList = data.jobNames || [];
-    employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
+    employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, jobTitle:e.jobTitle||'Operations', perms:{...e.perms} }));
     settings = (data.settings && data.settings.loginPin) ? data.settings : { loginPin: DEFAULT_LOGIN_PIN };
     auditLog = data.auditLog || [];
     signoffs = data.signoffs || [];
@@ -942,7 +943,7 @@ function renderAdminFooter(){
 /* ============ MANAGE EMPLOYEES (draft + explicit Save/Cancel) ============ */
 let employeesDraft = null;
 function openManageEmployees(){
-  employeesDraft = employees.map(e=>({ name:e.name, _origName:e.name, hourlyRate:e.hourlyRate||0, archived:!!e.archived, perms:{...e.perms} }));
+  employeesDraft = employees.map(e=>({ name:e.name, _origName:e.name, hourlyRate:e.hourlyRate||0, jobTitle:e.jobTitle||'Operations', archived:!!e.archived, perms:{...e.perms} }));
   renderEmployeeList();
   document.getElementById('employeeNameInput').value = '';
   openModal('modalEmployees');
@@ -954,10 +955,19 @@ function renderEmployeeList(){
   const rowHtml = (emp) => {
     const p = emp.perms || {};
     const key = escapeHtml(emp._origName).replace(/'/g,"\\'");
+    const jt = emp.jobTitle || 'Operations';
     return `<div class="list-row" style="flex-direction:column;align-items:stretch;gap:9px;">
       <div style="display:flex;align-items:center;gap:8px;">
         <input value="${escapeHtml(emp.name)}" style="flex:1;font-weight:700;padding:7px 9px;border:1.5px solid var(--line);border-radius:8px;" onchange="setDraftName('${key}',this.value)">
         <button class="del-btn" title="Archive" onclick="archiveEmployeeDraft('${key}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg></button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
+        <span>Job title</span>
+        <select style="padding:5px 7px;border:1.5px solid var(--line);border-radius:7px;font-size:12px;font-weight:700;color:var(--ink);" onchange="setDraftJobTitle('${key}',this.value)">
+          <option value="Operations" ${jt==='Operations'?'selected':''}>Operations</option>
+          <option value="Admin" ${jt==='Admin'?'selected':''}>Admin</option>
+        </select>
+        <span style="color:var(--muted);">${jt==='Admin' ? '— simple clock in/out only' : '— vehicle, jobs, Pre/Post-Trip'}</span>
       </div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
         <span>Hourly rate $</span>
@@ -994,6 +1004,11 @@ function setDraftName(origName, val){
   if(!emp) return;
   emp.name = val;
 }
+function setDraftJobTitle(origName, val){
+  const emp = employeesDraft.find(e=>e._origName===origName);
+  if(!emp) return;
+  emp.jobTitle = val;
+}
 function setDraftRate(origName, val){
   const emp = employeesDraft.find(e=>e._origName===origName);
   if(!emp) return;
@@ -1010,7 +1025,7 @@ function confirmAddEmployee(){
   const name = input.value.trim();
   if(!name){ showToast('Enter a name'); return; }
   if(employeesDraft.some(e=>e.name.toLowerCase()===name.toLowerCase())){ showToast('Already on the list'); input.value=''; return; }
-  employeesDraft.push({ name, _origName:name, hourlyRate:0, archived:false, perms:{vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false} });
+  employeesDraft.push({ name, _origName:name, hourlyRate:0, jobTitle:'Operations', archived:false, perms:{vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false} });
   input.value='';
   renderEmployeeList();
 }
@@ -1055,7 +1070,7 @@ async function saveEmployeeEdits(){
       anyRenamed = true;
     }
   });
-  const draftCopy = employeesDraft.map(e=>({ name:e.name.trim(), hourlyRate:e.hourlyRate||0, archived:!!e.archived, perms:{...e.perms} }));
+  const draftCopy = employeesDraft.map(e=>({ name:e.name.trim(), hourlyRate:e.hourlyRate||0, jobTitle:e.jobTitle||'Operations', archived:!!e.archived, perms:{...e.perms} }));
   employeesDraft = null;
   employees = draftCopy;
   const ok = await saveEmployees();
@@ -1560,7 +1575,7 @@ async function loadData(){
     entries = data.entries || [];
     vehicles = (data.vehicles && data.vehicles.length) ? data.vehicles : [...DEFAULT_VEHICLES];
     jobNameList = data.jobNames || [];
-    employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, perms:{...e.perms} }));
+    employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, jobTitle:e.jobTitle||'Operations', perms:{...e.perms} }));
     fetchJobTrackerNames();
     findTodayEntry();
     renderToday();
@@ -1655,8 +1670,23 @@ function persistToday(){
   if(idx===-1) entries.push(todayEntry); else entries[idx] = todayEntry;
   saveEntries();
 }
+function isAdminTitle(name){
+  const emp = employees.find(e=>e.name===name);
+  return !!(emp && emp.jobTitle === 'Admin');
+}
 function clockIn(){
   todayEntry = newEntry();
+  if(isAdminTitle(currentUser.name)){
+    // Admin job title: no vehicle, no Pre/Post-Trip, no job search — just a
+    // straight clock in/out. Marking these three gates done immediately
+    // means the existing render logic naturally lands on the simple
+    // "ready to clock out" screen with nothing else in between.
+    todayEntry.vehicle = 'No Vehicle';
+    todayEntry.preTripAt = nowIso();
+    todayEntry.returnedToShopAt = nowIso();
+    todayEntry.postTripAt = nowIso();
+    todayEntry.postTripChecks = { clean:false, gas:false, notApplicable:true };
+  }
   persistToday();
   renderToday();
   showToast('Clocked in — have a good one!');
@@ -1664,12 +1694,16 @@ function clockIn(){
 // Called back in after already clocking out today. Starts a new shift and
 // reopens the Post-Trip gate (since the vehicle may go out again), but
 // doesn't repeat Pre-Trip — same vehicle, already inspected once today.
+// Admin-titled employees skip all of that and go straight back to simple
+// clock-out-ready, since none of it ever applied to them in the first place.
 function clockBackIn(){
   const shifts = ensureShifts(todayEntry);
   shifts.push({ clockInAt: nowIso(), clockOutAt: null });
-  todayEntry.returnedToShopAt = null;
-  todayEntry.postTripAt = null;
-  todayEntry.postTripChecks = { clean:false, gas:false };
+  if(!isAdminTitle(todayEntry.employeeName)){
+    todayEntry.returnedToShopAt = null;
+    todayEntry.postTripAt = null;
+    todayEntry.postTripChecks = { clean:false, gas:false };
+  }
   persistToday();
   renderToday();
   showToast('Clocked back in');
@@ -1800,7 +1834,7 @@ function jobLogRowsHtml(){
 // "Admin" is a pinned pseudo-job for office/no-vehicle days — it's never a
 // real Job Tracker job (jobTrackerMap has no entry for it), so time logged
 // under it naturally never shows a "Send to Job Tracker" option later.
-const ADMIN_JOB_LABEL = 'Admin';
+const ADMIN_JOB_LABEL = 'Admin'; // kept only so any already-open "Admin" job log from before this change still renders correctly
 const FLOOR_CLEANING_JOB_LABEL = 'Floor Cleaning';
 function renderJobSearchResults(query){
   const box = document.getElementById('jobSearchResults');
@@ -1808,10 +1842,8 @@ function renderJobSearchResults(query){
   const q = (query||'').trim().toLowerCase();
   const names = allJobNames();
   const matches = q ? names.filter(n=>n.toLowerCase().includes(q)) : names;
-  const showAdmin = !q || ADMIN_JOB_LABEL.toLowerCase().includes(q);
   const showFloor = !q || FLOOR_CLEANING_JOB_LABEL.toLowerCase().includes(q);
   const rows = [];
-  if(showAdmin) rows.push(`<div class="jsr-row jsr-admin" onmousedown="selectJobSearchResult('${ADMIN_JOB_LABEL}')">${ADMIN_JOB_LABEL}</div>`);
   if(showFloor) rows.push(`<div class="jsr-row jsr-admin" onmousedown="selectJobSearchResult('${FLOOR_CLEANING_JOB_LABEL}')">${FLOOR_CLEANING_JOB_LABEL}</div>`);
   matches.slice(0,25).forEach(n=>{
     rows.push(`<div class="jsr-row" onmousedown="selectJobSearchResult('${escapeHtml(n).replace(/'/g,"\\'")}')">${escapeHtml(n)}</div>`);
@@ -2035,11 +2067,13 @@ function renderToday(){
   pill.textContent = 'Ready to clock out';
   pill.className = 'status-pill warn';
   const soFar = fmtDuration(entryHoursMs(todayEntry));
+  const adminTitle = isAdminTitle(todayEntry.employeeName);
   el.innerHTML = `
     <div class="card" style="text-align:center;">
-      <div class="card-title">All set for the day</div>
-      <div class="card-sub">Pre-Trip and Post-Trip are both done. Hours so far: ${soFar}.</div>
+      <div class="card-title">${adminTitle ? 'On the clock' : 'All set for the day'}</div>
+      <div class="card-sub">${adminTitle ? `Hours so far: ${soFar}.` : `Pre-Trip and Post-Trip are both done. Hours so far: ${soFar}.`}</div>
       <button class="btn btn-red" onclick="clockOut()">Clock Out</button>
+      ${adminTitle ? `<div class="hint" style="cursor:pointer;text-decoration:underline;" onclick="startLunch()">Take Lunch</div>` : ''}
     </div>
     ${jobLogRowsHtml()}`;
 }
