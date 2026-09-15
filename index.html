@@ -1087,19 +1087,18 @@ async function saveEmployeeEdits(){
   if(!confirm('Save these changes to the employee list and permissions?')) return;
   employeeSaveInFlight = true;
   // Cascade any renames to historical time entries so past days stay attributed correctly
-  let anyRenamed = false;
+  const renamedEntries = [];
   employeesDraft.forEach(e=>{
     const newName = e.name.trim();
     if(e._origName && e._origName !== newName){
-      entries.forEach(en=>{ if(en.employeeName===e._origName) en.employeeName = newName; });
-      anyRenamed = true;
+      entries.forEach(en=>{ if(en.employeeName===e._origName){ en.employeeName = newName; renamedEntries.push(en); } });
     }
   });
   const draftCopy = employeesDraft.map(e=>({ name:e.name.trim(), hourlyRate:e.hourlyRate||0, jobTitle:e.jobTitle||'Operations', archived:!!e.archived, perms:{...e.perms} }));
   employeesDraft = null;
   employees = draftCopy;
   const ok = await saveEmployees();
-  if(ok && anyRenamed) await saveEntries();
+  if(ok && renamedEntries.length) await saveEntriesMerged(renamedEntries);
   employeeSaveInFlight = false;
   if(ok){ showToast('Employee changes saved'); renderAdminFooter(); closeModal('modalEmployees'); }
 }
@@ -1227,8 +1226,9 @@ async function autoSyncEmployeeWeek(employeeName, weekMonday){
   if(baseRate<=0) return;
   const weekRate = weekEffectiveRate(employeeName, weekMonday, baseRate);
   const weekEntries = entries.filter(e=>e.employeeName===employeeName && mondayOf(e.date)===weekMonday);
-  let anyChanged = false;
+  const changedEntries = [];
   for(const entry of weekEntries){
+    let entryChanged = false;
     for(const jl of entry.jobLogs){
       if(!jl.jobId || !jl.endedAt) continue; // only finished sessions tied to a real Job Tracker job
       const ms = new Date(jl.endedAt) - new Date(jl.startedAt);
@@ -1242,13 +1242,14 @@ async function autoSyncEmployeeWeek(employeeName, weekMonday){
         jl.syncedToJobTracker = true;
         jl.syncedAmount = correctAmount;
         jl.syncedAt = nowIso();
-        anyChanged = true;
+        entryChanged = true;
       }catch(e){
         console.warn('Auto-sync to Job Tracker failed for a session — it stays available to send manually from the Job Report:', e);
       }
     }
+    if(entryChanged) changedEntries.push(entry);
   }
-  if(anyChanged) saveEntries();
+  if(changedEntries.length) saveEntriesMerged(changedEntries);
 }
 function allJobNames(){
   return [...new Set([...jobTrackerNames, ...jobNameList])].sort((a,b)=>a.localeCompare(b));
@@ -1616,12 +1617,57 @@ async function loadData(){
     if(entries.length===0) renderSetupScreen(true);
   }
 }
-async function saveEntries(){
+// Safely writes one or more entries into the backend WITHOUT wiping out
+// whatever other devices may have saved since this device last loaded data.
+// Fetches the current server state fresh, merges in only the specific
+// entries this device actually changed, and saves that — rather than
+// blindly overwriting the whole array with this device's local copy, which
+// is exactly what let one phone's stale data erase another person's
+// clock-out when several devices were active the same day.
+async function saveEntriesMerged(entriesToUpsert){
+  let latest;
   try{
-    const res = await apiPost('saveEntries', entries);
-    if(!res || !res.ok){ showToast('Save failed — backend rejected the update'); return false; }
+    const fresh = await apiGetAll();
+    latest = fresh.entries || [];
+  }catch(e){
+    latest = [...entries]; // couldn't refetch — fall back to local copy rather than fail outright
+  }
+  entriesToUpsert.forEach(entry=>{
+    const idx = latest.findIndex(e=>e.id===entry.id);
+    if(idx===-1) latest.push(entry); else latest[idx] = entry;
+  });
+  try{
+    const res = await apiPost('saveEntries', latest);
+    if(!res || !res.ok){ showToast('Save failed — backend rejected the update. Make sure the Apps Script was redeployed as a NEW VERSION after the last update.'); return false; }
+    entries = latest;
     return true;
   }catch(e){ console.error('save entries failed', e); showToast('Save failed — check your connection'); return false; }
+}
+// Deletes exactly one entry from the backend the same safe way — fetch
+// fresh, remove just this one by id, save — rather than overwriting with a
+// stale local array that could resurrect something someone else deleted,
+// or erase something someone else added.
+async function deleteEntryMerged(entryId){
+  let latest;
+  try{
+    const fresh = await apiGetAll();
+    latest = fresh.entries || [];
+  }catch(e){
+    latest = [...entries];
+  }
+  latest = latest.filter(e=>e.id!==entryId);
+  try{
+    const res = await apiPost('saveEntries', latest);
+    if(!res || !res.ok){ showToast('Save failed — backend rejected the update'); return false; }
+    entries = latest;
+    return true;
+  }catch(e){ console.error('delete entry failed', e); showToast('Save failed — check your connection'); return false; }
+}
+// Back-compat wrapper for any caller that hasn't been updated to specify
+// exactly which entries changed — merges the whole local array in one by
+// one. Prefer saveEntriesMerged([...]) with just the changed entries.
+async function saveEntries(){
+  return saveEntriesMerged(entries);
 }
 async function saveVehicles(){
   try{
@@ -1698,7 +1744,7 @@ function persistToday(){
   todayEntry.updatedAt = nowIso();
   const idx = entries.findIndex(e=>e.id===todayEntry.id);
   if(idx===-1) entries.push(todayEntry); else entries[idx] = todayEntry;
-  saveEntries();
+  saveEntriesMerged([todayEntry]);
 }
 function isAdminTitle(name){
   const emp = employees.find(e=>e.name===name);
@@ -2402,7 +2448,7 @@ async function sendLaborToJobTracker(employeeName, jobName, jobId, unsyncedMs, a
         }
       });
     });
-    await saveEntries();
+    await saveEntriesMerged(entries.filter(e=>e.employeeName===employeeName));
     showToast(`Sent $${amount.toFixed(2)} to Job Tracker`);
     renderJobReport();
   }catch(err){
@@ -2534,10 +2580,7 @@ function logAudit(employeeName, date, summaryLines){
 async function deleteAdjustEntireEntry(){
   if(!adjustDraft) return;
   if(!confirm(`Permanently delete ${adjustDraft.employeeName}'s entire time entry for ${fmtDateShort(adjustDraft.date)}? This cannot be undone.`)) return;
-  const idx = entries.findIndex(e=>e.id===adjustDraft.id);
-  if(idx===-1){ showToast('Entry not found'); return; }
-  entries.splice(idx,1);
-  const ok = await saveEntries();
+  const ok = await deleteEntryMerged(adjustDraft.id);
   if(ok){
     logAudit(adjustDraft.employeeName, adjustDraft.date, [`Deleted the entire day's entry (total ${fmtDuration(entryHoursMs(adjustDraft))})`]);
     showToast('Entry deleted');
@@ -2557,8 +2600,7 @@ async function saveAdjustTimes(){
   const idx = entries.findIndex(e=>e.id===adjustDraft.id);
   if(idx===-1){ showToast('Entry not found'); adjustSaveInFlight = false; return; }
   const changes = adjustOriginal ? diffAdjustChanges(adjustOriginal, adjustDraft) : [];
-  entries[idx] = adjustDraft;
-  const ok = await saveEntries();
+  const ok = await saveEntriesMerged([adjustDraft]);
   adjustSaveInFlight = false;
   if(ok){
     logAudit(adjustDraft.employeeName, adjustOriginal ? adjustOriginal.date : adjustDraft.date, changes);
