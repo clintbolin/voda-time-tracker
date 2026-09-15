@@ -918,7 +918,32 @@ function selectEmployee(name, skipLoad){
   findTodayEntry();
   renderToday();
   renderAdminFooter();
-  if(!tickHandle) tickHandle = setInterval(renderToday, 30000);
+  if(!tickHandle) tickHandle = setInterval(refreshDataFromServer, 30000);
+}
+// Pulls fresh entries/employees/settings from the backend without disrupting
+// whatever's on screen — the periodic 30s tick used to just re-render the
+// SAME locally-cached data over and over, so a device left open for a while
+// would never notice a clock-out (or anything else) that happened on
+// someone else's phone. This is what actually keeps things current.
+async function refreshDataFromServer(){
+  try{
+    const data = await apiGetAll();
+    if(data.entries) entries = data.entries;
+    if(data.employees && data.employees.length) employees = data.employees;
+    if(data.settings && data.settings.loginPin) settings = data.settings;
+    if(data.auditLog) auditLog = data.auditLog;
+    if(data.signoffs) signoffs = data.signoffs;
+    // Re-find todayEntry by id in the fresh data rather than trusting the
+    // old object reference, so in-progress local state stays pointed at
+    // the right (now updated) record instead of a stale clone.
+    if(todayEntry){
+      const fresh = entries.find(e=>e.id===todayEntry.id);
+      if(fresh) todayEntry = fresh;
+    }
+  }catch(e){
+    console.warn('Background refresh failed — will retry on the next tick', e);
+  }
+  renderToday();
 }
 function switchEmployee(){
   if(!confirm(`Switch off ${currentUser?currentUser.name:'this account'}?`)) return;
@@ -1386,7 +1411,12 @@ function entryStatusText(entry){
   if(!entry.postTripAt) return 'Post-Trip pending';
   return 'Ready to clock out';
 }
-function openWhosOn(){ renderWhosOn(); openModal('modalWhosOn'); }
+async function openWhosOn(){
+  openModal('modalWhosOn');
+  document.getElementById('whosOnList').innerHTML = `<div class="empty">Checking latest status…</div>`;
+  await refreshDataFromServer();
+  renderWhosOn();
+}
 function renderWhosOn(){
   const wrap = document.getElementById('whosOnList');
   const onClock = entries.filter(e=>{
