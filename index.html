@@ -712,11 +712,30 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">My Hours</div><div class="sheet-sub">Review and certify your time</div></div>
     <button class="close-x" onclick="closeModal('modalMySignoff')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <button class="btn btn-ghost" style="width:auto;padding:8px 14px;" onclick="shiftMyHoursCalMonth(-1)">&larr;</button>
+    <div id="myHoursCalMonthLabel" style="font-weight:800;font-size:14px;"></div>
+    <button class="btn btn-ghost" style="width:auto;padding:8px 14px;" onclick="shiftMyHoursCalMonth(1)">&rarr;</button>
+  </div>
+  <div id="myHoursCalGrid"></div>
+  <div class="hint" style="text-align:center;">Tap any day you worked to see the job-by-job breakdown.</div>
+  <div style="height:1px;background:var(--line);margin:14px 0;"></div>
+  <div class="card-eyebrow">Certify a date range</div>
   <div style="display:flex;gap:8px;">
     <div class="field" style="flex:1;"><label>From</label><input type="date" id="mySignoffFrom" onchange="renderMySignoff()"></div>
     <div class="field" style="flex:1;"><label>To</label><input type="date" id="mySignoffTo" onchange="renderMySignoff()"></div>
   </div>
   <div id="mySignoffBody"></div>
+</div></div>
+
+<!-- One day's own job-by-job breakdown -->
+<div class="overlay" id="modalMyDayDetail"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title" id="myDayDetailDate"></div><div class="sheet-sub" id="myDayDetailTotal"></div></div>
+    <button class="close-x" onclick="closeModal('modalMyDayDetail')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div id="myDayDetailBody"></div>
 </div></div>
 
 <div class="overlay" id="modalAdjustTimes"><div class="sheet">
@@ -2488,7 +2507,60 @@ function openMySignoff(){
   document.getElementById('mySignoffFrom').value = mondayOf(addDays(to,-13));
   document.getElementById('mySignoffTo').value = to;
   renderMySignoff();
+  const now = new Date();
+  myHoursCalYear = now.getFullYear();
+  myHoursCalMonth = now.getMonth();
+  renderMyHoursCalendar();
   openModal('modalMySignoff');
+}
+/* ---- Personal hours calendar (own data only) — reuses the same grid look as the Job Calendar ---- */
+let myHoursCalYear, myHoursCalMonth; // myHoursCalMonth is 0-indexed
+function shiftMyHoursCalMonth(delta){
+  myHoursCalMonth += delta;
+  if(myHoursCalMonth < 0){ myHoursCalMonth = 11; myHoursCalYear--; }
+  if(myHoursCalMonth > 11){ myHoursCalMonth = 0; myHoursCalYear++; }
+  renderMyHoursCalendar();
+}
+function renderMyHoursCalendar(){
+  document.getElementById('myHoursCalMonthLabel').textContent = new Date(myHoursCalYear, myHoursCalMonth, 1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const startWeekday = new Date(myHoursCalYear, myHoursCalMonth, 1).getDay();
+  const daysInMonth = new Date(myHoursCalYear, myHoursCalMonth+1, 0).getDate();
+  const pad = n=>String(n).padStart(2,'0');
+  const monthPrefix = `${myHoursCalYear}-${pad(myHoursCalMonth+1)}-`;
+
+  const hoursByDay = {};
+  entries.forEach(e=>{
+    if(e.employeeName===currentUser.name && e.date.startsWith(monthPrefix)){
+      hoursByDay[Number(e.date.slice(8,10))] = entryHoursMs(e);
+    }
+  });
+
+  let html = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  for(let i=0;i<startWeekday;i++) html += `<div class="cal-day empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const ms = hoursByDay[d];
+    const dateStr = `${monthPrefix}${pad(d)}`;
+    const chip = ms ? `<div class="cal-job-chip" style="background:var(--gold);color:var(--black);" onclick="openMyDayDetail('${dateStr}')">${fmtDuration(ms)}</div>` : '';
+    html += `<div class="cal-day"><div class="cal-daynum">${d}</div>${chip}</div>`;
+  }
+  document.getElementById('myHoursCalGrid').innerHTML = `<div class="cal-grid">${html}</div>`;
+}
+function openMyDayDetail(dateStr){
+  const entry = entries.find(e=>e.employeeName===currentUser.name && e.date===dateStr);
+  if(!entry) return;
+  document.getElementById('myDayDetailDate').textContent = fmtDateLong(dateStr);
+  document.getElementById('myDayDetailTotal').textContent = 'Total: ' + fmtDuration(entryHoursMs(entry));
+  const wrap = document.getElementById('myDayDetailBody');
+  if(entry.jobLogs.length===0){
+    wrap.innerHTML = `<div class="empty">No jobs logged this day (shop/office time only).</div>`;
+  } else {
+    const rows = entry.jobLogs.map(jl=>{
+      const ms = (jl.endedAt?new Date(jl.endedAt):new Date()) - new Date(jl.startedAt);
+      return `<tr><td>${escapeHtml(jl.jobName)}</td><td>${fmtTime(jl.startedAt)}&ndash;${jl.endedAt?fmtTime(jl.endedAt):'now'}</td><td>${fmtDuration(ms)}</td></tr>`;
+    }).join('');
+    wrap.innerHTML = `<table class="report-table"><thead><tr><th>Job</th><th>Time</th><th>Hours</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  openModal('modalMyDayDetail');
 }
 function renderMySignoff(){
   const from = document.getElementById('mySignoffFrom').value;
