@@ -803,7 +803,7 @@ const DEFAULT_EMPLOYEES = [
   { name:"Arturo Hoyos", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
   { name:"Joe", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
   { name:"Daniel", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } },
-  { name:"Miguel Perez", hourlyRate:0, jobTitle:"Operations", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } }
+  { name:"Miguel Perez", hourlyRate:0, jobTitle:"Print & Ops", perms:{ vehicles:false, jobs:false, employees:false, reports:false, adjustTimes:false } }
 ];
 let currentUser = null; // { name }
 
@@ -1065,9 +1065,10 @@ function renderEmployeeList(){
         <span>Job title</span>
         <select style="padding:5px 7px;border:1.5px solid var(--line);border-radius:7px;font-size:12px;font-weight:700;color:var(--ink);" onchange="setDraftJobTitle('${key}',this.value)">
           <option value="Operations" ${jt==='Operations'?'selected':''}>Operations</option>
+          <option value="Print & Ops" ${jt==='Print & Ops'?'selected':''}>Print & Ops</option>
           <option value="Admin" ${jt==='Admin'?'selected':''}>Admin</option>
         </select>
-        <span style="color:var(--muted);">${jt==='Admin' ? '— simple clock in/out only' : '— vehicle, jobs, Pre/Post-Trip'}</span>
+        <span style="color:var(--muted);">${jt==='Admin' ? '— simple clock in/out only' : (jt==='Print & Ops' ? '— vehicle, jobs, Pre/Post-Trip, plus Printing' : '— vehicle, jobs, Pre/Post-Trip')}</span>
       </div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
         <span>Hourly rate $</span>
@@ -2024,7 +2025,15 @@ const ADMIN_JOB_LABEL = 'Admin'; // kept only so any already-open "Admin" job lo
 const MEETING_JOB_LABEL = 'Meeting';
 const CLEANINGS_JOB_LABEL = 'Cleanings';
 const EQUIPMENT_CLEANING_JOB_LABEL = 'Equipment Cleaning';
+const PRINTING_JOB_LABEL = 'Printing';
 const PINNED_JOB_LABELS = [MEETING_JOB_LABEL, CLEANINGS_JOB_LABEL, EQUIPMENT_CLEANING_JOB_LABEL];
+// Printing is only pinned for employees whose Job Title is "Print & Ops"
+// (currently just Miguel) — everyone else's pinned list is unchanged.
+function pinnedJobLabelsForCurrentUser(){
+  const emp = currentUser ? employees.find(e=>e.name===currentUser.name) : null;
+  const jt = emp ? (emp.jobTitle || 'Operations') : 'Operations';
+  return jt === 'Print & Ops' ? [...PINNED_JOB_LABELS, PRINTING_JOB_LABEL] : PINNED_JOB_LABELS;
+}
 function renderJobSearchResults(query){
   const box = document.getElementById('jobSearchResults');
   if(!box) return;
@@ -2032,7 +2041,7 @@ function renderJobSearchResults(query){
   const names = allJobNames();
   const matches = q ? names.filter(n=>n.toLowerCase().includes(q)) : names;
   const rows = [];
-  PINNED_JOB_LABELS.forEach(label=>{
+  pinnedJobLabelsForCurrentUser().forEach(label=>{
     if(!q || label.toLowerCase().includes(q)){
       rows.push(`<div class="jsr-row jsr-admin" onmousedown="selectJobSearchResult('${label}')">${label}</div>`);
     }
