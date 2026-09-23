@@ -1735,6 +1735,29 @@ async function loadData(){
 // blindly overwriting the whole array with this device's local copy, which
 // is exactly what let one phone's stale data erase another person's
 // clock-out when several devices were active the same day.
+// Report modals cache their table HTML at render time and don't
+// automatically know when the underlying `entries` data changes elsewhere
+// (e.g. an Adjust Times save made right after opening a report, or two
+// saves back-to-back). Without this, a report left open — or even reopened
+// too quickly — can keep showing a stale snapshot from before the latest
+// change, even though the saved data itself is correct.
+const OPEN_REPORT_REFRESHERS = {
+  modalDailyReport: () => renderDailyReport(),
+  modalWeeklyReport: () => renderWeeklyReport(),
+  modalPayrollReport: () => renderPayrollReport(),
+  modalEmployeeReport: () => renderEmployeeReport(),
+  modalDetailedLabor: () => renderDetailedLaborReport(),
+  modalJobReport: () => renderJobReport(),
+};
+function refreshOpenReports(){
+  Object.keys(OPEN_REPORT_REFRESHERS).forEach(id=>{
+    const el = document.getElementById(id);
+    if(el && el.classList.contains('active')){
+      try{ OPEN_REPORT_REFRESHERS[id](); }
+      catch(e){ console.warn('Failed to refresh open report', id, e); }
+    }
+  });
+}
 async function saveEntriesMerged(entriesToUpsert){
   let latest;
   try{
@@ -1751,6 +1774,7 @@ async function saveEntriesMerged(entriesToUpsert){
     const res = await apiPost('saveEntries', latest);
     if(!res || !res.ok){ showToast('Save failed — backend rejected the update. Make sure the Apps Script was redeployed as a NEW VERSION after the last update.'); return false; }
     entries = latest;
+    refreshOpenReports();
     return true;
   }catch(e){ console.error('save entries failed', e); showToast('Save failed — check your connection'); return false; }
 }
@@ -1771,6 +1795,7 @@ async function deleteEntryMerged(entryId){
     const res = await apiPost('saveEntries', latest);
     if(!res || !res.ok){ showToast('Save failed — backend rejected the update'); return false; }
     entries = latest;
+    refreshOpenReports();
     return true;
   }catch(e){ console.error('delete entry failed', e); showToast('Save failed — check your connection'); return false; }
 }
