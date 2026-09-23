@@ -166,7 +166,7 @@ main.content{padding:16px 14px 4px;}
 .hint{font-size:12px;color:var(--muted);background:var(--gray-bg);border-radius:8px;padding:9px 11px;margin-top:4px;margin-bottom:14px;line-height:1.45;}
 .empty{text-align:center;padding:24px 12px;color:var(--muted);font-size:13px;}
 
-.quote-box{text-align:center;font-size:12.5px;font-style:italic;color:var(--muted);padding:14px 18px 4px;line-height:1.5;}
+.quote-box{text-align:center;font-size:17px;font-weight:700;font-style:italic;color:var(--ink);padding:16px 18px 6px;line-height:1.45;}
 .admin-footer{text-align:center;padding:18px 0 4px;}
 .admin-footer span{font-size:10.5px;color:var(--line);cursor:pointer;letter-spacing:0.3px;}
 .admin-footer span:active{color:var(--muted);}
@@ -2792,10 +2792,38 @@ function loadAdjustEntry(){
   const wrap = document.getElementById('adjustTimesBody');
   if(!name || !date){ wrap.innerHTML = `<div class="empty">Choose an employee and date.</div>`; adjustDraft = null; adjustOriginal = null; return; }
   const entry = entries.find(e=>e.employeeName.toLowerCase()===name.toLowerCase() && e.date===date);
-  if(!entry){ wrap.innerHTML = `<div class="empty">No time entry for ${escapeHtml(name)} on ${fmtDateShort(date)}.</div>`; adjustDraft = null; adjustOriginal = null; return; }
+  if(!entry){
+    wrap.innerHTML = `<div class="empty">No time entry for ${escapeHtml(name)} on ${fmtDateShort(date)}.</div>
+      <button class="btn btn-gold" style="width:100%;margin-top:10px;" onclick="createAdjustEntry(${JSON.stringify(name)},${JSON.stringify(date)})">+ Create a new entry for this day</button>`;
+    adjustDraft = null; adjustOriginal = null; return;
+  }
   ensureShifts(entry);
   adjustDraft = JSON.parse(JSON.stringify(entry));
   adjustOriginal = JSON.parse(JSON.stringify(entry));
+  renderAdjustForm();
+}
+// Builds a fresh entry for a day that was never clocked (missed due to an
+// outage, an update mid-shift, forgetting a device, etc.) so a missing day
+// can be backfilled directly instead of the old workaround of clocking
+// someone in/out today and then moving that entry's date, which left a
+// leftover "today" entry to clean up and was easy to get wrong.
+// adjustOriginal stays null — that's the signal saveAdjustTimes() uses to
+// know this is a create, not an edit, for audit-log wording.
+function createAdjustEntry(name, date){
+  adjustDraft = {
+    id: uid('T'),
+    employeeName: name,
+    date: date,
+    shifts: [{ clockInAt: new Date(date+'T09:00').toISOString(), clockOutAt: new Date(date+'T17:00').toISOString() }],
+    vehicle: 'N/A (backfilled)',
+    preTripAt: nowIso(),
+    jobLogs: [],
+    returnedToShopAt: nowIso(),
+    postTripChecks: { clean:false, gas:false, notApplicable:true },
+    postTripAt: nowIso(),
+    updatedAt: nowIso()
+  };
+  adjustOriginal = null;
   renderAdjustForm();
 }
 function toDatetimeLocal(iso){
@@ -2830,6 +2858,7 @@ function renderAdjustForm(){
     <div class="hint" style="margin-top:-8px;">Change this to move this whole day's entry to a different date (backdate a missed clock-in, fix a wrong day, etc.).</div>
     <div class="card-eyebrow" style="margin-top:14px;">Shifts</div>
     ${shiftsHtml || '<div class="empty">No shifts.</div>'}
+    <button class="btn btn-ghost" style="width:100%;margin-top:4px;" onclick="addAdjustShift()">+ Add another shift</button>
     <div class="card-eyebrow" style="margin-top:14px;">Job logs (blank end = still in progress)</div>
     ${jobsHtml || '<div class="empty">No jobs logged.</div>'}
     <div class="btn-row" style="margin-top:16px;">
@@ -2839,6 +2868,10 @@ function renderAdjustForm(){
     <div style="height:1px;background:var(--line);margin:18px 0 14px;"></div>
     <button class="btn btn-red" onclick="deleteAdjustEntireEntry()">Delete This Entire Day's Entry</button>
     <div class="hint">For test data or a forgotten clock-in/out — permanently removes this whole day for this employee.</div>`;
+}
+function addAdjustShift(){
+  adjustDraft.shifts.push({ clockInAt: null, clockOutAt: null });
+  renderAdjustForm();
 }
 function deleteAdjustShift(i){
   if(!confirm(`Delete Shift ${i+1}? This can't be undone until you also tap Save Changes, but there's no confirmation after that.`)) return;
@@ -2912,16 +2945,15 @@ async function saveAdjustTimes(){
   if(!adjustDraft || adjustSaveInFlight) return;
   const conflict = entries.find(e=>e.id!==adjustDraft.id && e.employeeName.toLowerCase()===adjustDraft.employeeName.toLowerCase() && e.date===adjustDraft.date);
   if(conflict){ showToast(`${adjustDraft.employeeName} already has a separate entry on ${fmtDateShort(adjustDraft.date)} — delete or move that one first.`); return; }
-  if(!confirm("Save these time adjustments? This directly changes the employee's recorded hours.")) return;
+  const isNewEntry = !adjustOriginal;
+  if(!confirm(isNewEntry ? "Create this new time entry? This directly adds recorded hours for this employee." : "Save these time adjustments? This directly changes the employee's recorded hours.")) return;
   adjustSaveInFlight = true;
-  const idx = entries.findIndex(e=>e.id===adjustDraft.id);
-  if(idx===-1){ showToast('Entry not found'); adjustSaveInFlight = false; return; }
-  const changes = adjustOriginal ? diffAdjustChanges(adjustOriginal, adjustDraft) : [];
+  const changes = isNewEntry ? [`Created new entry (${fmtDuration(entryHoursMs(adjustDraft))})`] : diffAdjustChanges(adjustOriginal, adjustDraft);
   const ok = await saveEntriesMerged([adjustDraft]);
   adjustSaveInFlight = false;
   if(ok){
     logAudit(adjustDraft.employeeName, adjustOriginal ? adjustOriginal.date : adjustDraft.date, changes);
-    showToast('Time entry updated');
+    showToast(isNewEntry ? 'Time entry created' : 'Time entry updated');
     if(todayEntry && todayEntry.id===adjustDraft.id){ todayEntry = adjustDraft; renderToday(); }
     adjustOriginal = null;
     closeModal('modalAdjustTimes');
@@ -3001,7 +3033,23 @@ boot();
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(err => console.warn('Service worker registration failed:', err));
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      // If a new version activates while this tab is open, reload once
+      // automatically instead of leaving the device silently stuck on
+      // old code (see project log, 2026-09-22).
+      let refreshed = false;
+      navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+        if(refreshed) return;
+        refreshed = true;
+        window.location.reload();
+      });
+      // A phone that's been asleep for hours won't otherwise notice a
+      // new deploy until it's fully closed and reopened — check as soon
+      // as it wakes back up.
+      document.addEventListener('visibilitychange', ()=>{
+        if(document.visibilityState==='visible') reg.update();
+      });
+    }).catch(err => console.warn('Service worker registration failed:', err));
   });
 }
 </script>
