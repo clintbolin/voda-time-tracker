@@ -318,6 +318,7 @@ main.content{padding:16px 14px 4px;}
       </div>
     </div>
     <div class="signed-in-banner" id="signedInBanner" style="display:none;"></div>
+    <div class="signed-in-banner" id="updateBanner" style="display:none;background:var(--gold);color:#1a1200;cursor:pointer;font-weight:700;" onclick="window.location.reload()">A new version is available — tap to refresh</div>
     <div class="header-meta">
       <div class="header-date" id="headerDate"></div>
       <div class="status-pill" id="statusPill">—</div>
@@ -760,6 +761,11 @@ const CONFIG = {
   API_URL: "https://script.google.com/macros/s/AKfycbxYbRsKXvc_LU1Q9glESAikQOHcG0fMGfsb8pWPXtM43elxav5XKtTB9CYRQDHJL_SHQA/exec"
 };
 const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !== 0;
+// Bumped by hand each time a new version of this file is deployed — the
+// update-check below fetches the live index.html and compares this value to
+// notice a new deploy even on a device that's had the app open all day and
+// hasn't reloaded on its own. See project log, 2026-09-22.
+const BUILD_ID = "2026-09-22T00";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -3031,24 +3037,37 @@ async function removeJobName(name){
 boot();
 </script>
 <script>
+function showUpdateBanner(){
+  const el = document.getElementById('updateBanner');
+  if(el) el.style.display = 'block';
+}
+// Catches an update even when sw.js itself hasn't changed (the common case —
+// most updates only touch this file). Fetches the live index.html straight
+// from the network (bypassing any cache) and compares its BUILD_ID to the
+// one this tab loaded with. A mismatch means a newer version has been
+// deployed since this page was opened.
+async function checkForUpdate(){
+  try{
+    const res = await fetch('./', { cache: 'no-store' });
+    const html = await res.text();
+    const m = html.match(/const BUILD_ID = "([^"]+)"/);
+    if(m && m[1] !== BUILD_ID) showUpdateBanner();
+  }catch(e){ /* offline or unreachable — just skip this check */ }
+}
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').then(reg=>{
-      // If a new version activates while this tab is open, reload once
-      // automatically instead of leaving the device silently stuck on
-      // old code (see project log, 2026-09-22).
-      let refreshed = false;
-      navigator.serviceWorker.addEventListener('controllerchange', ()=>{
-        if(refreshed) return;
-        refreshed = true;
-        window.location.reload();
-      });
-      // A phone that's been asleep for hours won't otherwise notice a
-      // new deploy until it's fully closed and reopened — check as soon
-      // as it wakes back up.
+      // A new service worker taking over means a new deploy — but rather
+      // than yanking the page out from under someone mid-edit, just surface
+      // the same banner and let them choose when to refresh.
+      navigator.serviceWorker.addEventListener('controllerchange', showUpdateBanner);
+      // A phone that's been asleep for hours won't otherwise notice a new
+      // deploy until fully closed and reopened — check as soon as it wakes
+      // back up, and periodically while it stays open and active.
       document.addEventListener('visibilitychange', ()=>{
-        if(document.visibilityState==='visible') reg.update();
+        if(document.visibilityState==='visible'){ reg.update(); checkForUpdate(); }
       });
+      setInterval(checkForUpdate, 5*60*1000);
     }).catch(err => console.warn('Service worker registration failed:', err));
   });
 }
