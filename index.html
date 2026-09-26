@@ -326,6 +326,7 @@ main.content{padding:16px 14px 4px;}
   </header>
 
   <main class="content">
+    <div class="signed-in-banner" id="myUnresolvedBanner" style="display:none;background:var(--red);color:#fff;font-weight:700;"></div>
     <div id="todayContent"></div>
     <div class="quote-box" id="quoteBox"></div>
     <div class="admin-footer" id="adminFooter"></div>
@@ -1010,6 +1011,7 @@ function selectEmployee(name, skipLoad){
   findTodayEntry();
   renderToday();
   renderAdminFooter();
+  checkMyOwnUnresolvedEntries();
   if(!tickHandle) tickHandle = setInterval(refreshDataFromServer, 30000);
 }
 // Pulls fresh entries/employees/settings from the backend without disrupting
@@ -1036,6 +1038,8 @@ async function refreshDataFromServer(){
     console.warn('Background refresh failed — will retry on the next tick', e);
   }
   renderToday();
+  renderAdminFooter();
+  checkMyOwnUnresolvedEntries();
 }
 function switchEmployee(){
   if(!confirm(`Switch off ${currentUser?currentUser.name:'this account'}?`)) return;
@@ -1054,7 +1058,33 @@ function renderAdminFooter(){
   if(!wrap || !currentUser) return;
   const p = currentPerms();
   const anyAccess = p.vehicles || p.jobs || p.employees || p.reports || p.adjustTimes;
-  wrap.innerHTML = anyAccess ? `<span onclick="openAdminMenu()">Admin</span>` : '';
+  if(!anyAccess){ wrap.innerHTML = ''; return; }
+  // A passive count so an admin sees there's something to fix just by
+  // opening the app — no need to remember to go check a specific report.
+  // Only counts entries other than the signed-in admin's own (their own
+  // shows in the red banner above instead), so the two don't double-warn
+  // about the same thing.
+  const count = entries.filter(e=>e.employeeName!==currentUser.name && entryNeedsHoursReview(e)).length;
+  const badge = count>0 ? ` <span style="background:var(--red);color:#fff;border-radius:99px;padding:1px 7px;font-size:10px;font-weight:800;margin-left:4px;">${count}</span>` : '';
+  wrap.innerHTML = `<span onclick="openAdminMenu()">Admin${badge}</span>`;
+}
+// Warns the signed-in employee, right when they open the app, if one of
+// THEIR OWN past days has a shift with a missing or impossible clock time
+// (see entryNeedsHoursReview). This is deliberately not a one-time dismiss —
+// it's the app's main defense against needing an admin to proactively go
+// looking for these: the person who actually knows what really happened
+// that day sees it immediately and can flag it to their supervisor, rather
+// than it sitting invisible until a payroll report happens to surface it
+// weeks later. Doesn't block clocking in — techs still need to get to job
+// sites — it just makes the problem impossible to miss.
+function checkMyOwnUnresolvedEntries(){
+  const el = document.getElementById('myUnresolvedBanner');
+  if(!el || !currentUser) return;
+  const mine = entries.filter(e=>e.employeeName===currentUser.name && e.date!==todayStr() && entryNeedsHoursReview(e));
+  if(mine.length===0){ el.style.display = 'none'; return; }
+  const dates = mine.map(e=>fmtDateShort(e.date)).join(', ');
+  el.style.display = '';
+  el.innerHTML = `⚠ Your time for ${escapeHtml(dates)} has a missing or wrong clock-out. Please tell your supervisor so it can be fixed before payroll.`;
 }
 
 /* ============ MANAGE EMPLOYEES (draft + explicit Save/Cancel) ============ */
@@ -1455,9 +1485,15 @@ function entryHoursMs(entry){
 // Both are data errors, not real worked time, so both get treated the same
 // way below rather than needing two separate detectors.
 const SANE_MAX_SHIFT_MS = 24*3600*1000;
-function shiftLooksBroken(s){
-  const ms = (s.clockOutAt ? new Date(s.clockOutAt) : new Date()) - new Date(s.clockInAt);
+// Generic version, since job logs use startedAt/endedAt instead of
+// clockInAt/clockOutAt but need exactly the same sanity check (see
+// saveAdjustTimes, which validates both before allowing a save).
+function rangeLooksBroken(startIso, endIso){
+  const ms = (endIso ? new Date(endIso) : new Date()) - new Date(startIso);
   return ms < 0 || ms > SANE_MAX_SHIFT_MS;
+}
+function shiftLooksBroken(s){
+  return rangeLooksBroken(s.clockInAt, s.clockOutAt);
 }
 // True if any shift in this entry — open or already closed — looks broken
 // per shiftLooksBroken above. Use this to show an admin/employee-facing
@@ -1830,6 +1866,12 @@ function refreshOpenReports(){
       catch(e){ console.warn('Failed to refresh open report', id, e); }
     }
   });
+  // A save/delete is exactly when a flagged entry most likely just got
+  // fixed (or, in the case of a bad Adjust Times edit, just got created) —
+  // update the passive admin badge and the employee's own warning banner
+  // right away rather than waiting for the next 30s tick.
+  renderAdminFooter();
+  checkMyOwnUnresolvedEntries();
 }
 async function saveEntriesMerged(entriesToUpsert){
   let latest;
@@ -3090,10 +3132,40 @@ async function deleteAdjustEntireEntry(){
   }
 }
 let adjustSaveInFlight = false;
+// Blocks the save outright if what's about to be written still doesn't add
+// up — a negative duration or a span over 24 hours on any shift or job log.
+// This is the fix aimed directly at what happened with Cruz Cota: an edit
+// made here previously produced a corrupted clock-in that immediately
+// showed "thousands of hours," same day. Rather than only catching that
+// after the fact in a report, this stops it from ever being saved in the
+// first place and tells Clint exactly which field is the problem so it can
+// be corrected right there. Returns null if everything looks fine.
+function findAdjustDraftProblem(draft){
+  for(let i=0;i<draft.shifts.length;i++){
+    const s = draft.shifts[i];
+    if(!s.clockInAt) continue; // blank clock-in on a still-being-typed row — not saveable yet, but not "broken" either; other validation below catches missing required fields
+    if(rangeLooksBroken(s.clockInAt, s.clockOutAt)){
+      return s.clockOutAt && new Date(s.clockOutAt) < new Date(s.clockInAt)
+        ? `Shift ${i+1}'s clock-out is before its clock-in.`
+        : `Shift ${i+1} is over 24 hours long — check its clock-in and clock-out times.`;
+    }
+  }
+  for(let i=0;i<draft.jobLogs.length;i++){
+    const jl = draft.jobLogs[i];
+    if(rangeLooksBroken(jl.startedAt, jl.endedAt)){
+      return jl.endedAt && new Date(jl.endedAt) < new Date(jl.startedAt)
+        ? `"${jl.jobName}" ends before it starts.`
+        : `"${jl.jobName}" is over 24 hours long — check its start and end times.`;
+    }
+  }
+  return null;
+}
 async function saveAdjustTimes(){
   if(!adjustDraft || adjustSaveInFlight) return;
   const conflict = entries.find(e=>e.id!==adjustDraft.id && e.employeeName.toLowerCase()===adjustDraft.employeeName.toLowerCase() && e.date===adjustDraft.date);
   if(conflict){ showToast(`${adjustDraft.employeeName} already has a separate entry on ${fmtDateShort(adjustDraft.date)} — delete or move that one first.`); return; }
+  const problem = findAdjustDraftProblem(adjustDraft);
+  if(problem){ showToast(`Can't save — ${problem}`); return; }
   const isNewEntry = !adjustOriginal;
   if(!confirm(isNewEntry ? "Create this new time entry? This directly adds recorded hours for this employee." : "Save these time adjustments? This directly changes the employee's recorded hours.")) return;
   adjustSaveInFlight = true;
