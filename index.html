@@ -376,6 +376,7 @@ main.content{padding:16px 14px 4px;}
     <button class="close-x" onclick="closeModal('modalReportsHub')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div style="display:flex;flex-direction:column;gap:8px;">
+    <button class="btn btn-gold" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openStaleShiftsReport()">⚠ Shift times needing review</button>
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openWhosOn()">Who's clocked in now</button>
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openDailyReport()">Daily hours report</button>
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openWeeklyReport()">Weekly hours report (Mon&ndash;Sun)</button>
@@ -647,6 +648,16 @@ main.content{padding:16px 14px 4px;}
     <div class="field" style="flex:1;"><label>To</label><input type="date" id="auditLogTo" onchange="renderAuditLog()"></div>
   </div>
   <div id="auditLogBody"></div>
+</div></div>
+
+<!-- Shift times needing review (missing clock-outs or impossible durations) -->
+<div class="overlay" id="modalStaleShifts"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Shift times needing review</div><div class="sheet-sub">A missing clock-out, or a clock-in/out that doesn't add up</div></div>
+    <button class="close-x" onclick="closeModal('modalStaleShifts')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div id="staleShiftsBody"></div>
 </div></div>
 
 <!-- Employee sign-offs (admin view of everyone's certifications) -->
@@ -1429,6 +1440,51 @@ function entryHoursMs(entry){
   const shifts = ensureShifts(entry);
   return shifts.reduce((sum,s)=> sum + ((s.clockOutAt?new Date(s.clockOutAt):new Date()) - new Date(s.clockInAt)), 0);
 }
+// A single shift is "broken" if its duration is negative (clock-out entered
+// before clock-in — easy to do by hand in Adjust Times, or a sign of a
+// timestamp landing on the wrong date) or absurdly long (over 24 hours —
+// no real Voda shift runs that long without a break). This same check
+// catches two different real incidents:
+//  - An old shift nobody closed out: entryHoursMs keeps measuring an open
+//    shift against "right now," so a forgotten Sep 10 clock-in still open on
+//    Sep 25 reports as 350+ hours and keeps growing every day after that
+//    (found via a Weekly/Payroll report showing hundreds of hours).
+//  - A clock-in edited in Adjust Times that lands on the wrong timestamp:
+//    reported the same day it happened, already showing "thousands of
+//    hours" and still climbing while the shift was still open.
+// Both are data errors, not real worked time, so both get treated the same
+// way below rather than needing two separate detectors.
+const SANE_MAX_SHIFT_MS = 24*3600*1000;
+function shiftLooksBroken(s){
+  const ms = (s.clockOutAt ? new Date(s.clockOutAt) : new Date()) - new Date(s.clockInAt);
+  return ms < 0 || ms > SANE_MAX_SHIFT_MS;
+}
+// True if any shift in this entry — open or already closed — looks broken
+// per shiftLooksBroken above. Use this to show an admin/employee-facing
+// warning. Do NOT use this to gate the live "today" experience
+// (renderToday, Who's Clocked In, the long-shift audio warnings below) —
+// someone genuinely mid-shift today should never be interrupted by this;
+// it's meant for reports looking back at entries that are already done.
+function entryNeedsHoursReview(entry){
+  const shifts = ensureShifts(entry);
+  return shifts.some(shiftLooksBroken);
+}
+// Safe to use in place of entryHoursMs anywhere a REPORT is totaling up
+// past days (Daily/Weekly/Payroll/Employee/Detailed Labor/My Hours/sign-off
+// certification). Any broken shift (see shiftLooksBroken) contributes 0
+// instead of its bogus duration, so payroll totals can never silently
+// include phantom or negative hours — any other normal shift that same day
+// still counts. Pair this with entryNeedsHoursReview(entry) to show a
+// warning instead of just a quietly-short total. Do NOT use this for a live
+// "today" view (renderToday, Who's Clocked In) — entryHoursMs already
+// handles a genuinely-in-progress shift correctly there.
+function entryHoursMsForReport(entry){
+  const shifts = ensureShifts(entry);
+  return shifts.reduce((sum,s)=>{
+    if(shiftLooksBroken(s)) return sum;
+    return sum + ((s.clockOutAt?new Date(s.clockOutAt):new Date()) - new Date(s.clockInAt));
+  }, 0);
+}
 
 /* ============ LONG-SHIFT WARNINGS (9h mild, 11h moderate, 12h stern) ============ */
 // Phones block audio that isn't triggered by a direct tap — and these
@@ -1588,8 +1644,12 @@ function renderDailyReport(){
       const shifts = ensureShifts(e);
       const clockIn = shifts.length ? fmtTime(shifts[0].clockInAt) : '—';
       const last = shifts[shifts.length-1];
-      const clockOut = last && last.clockOutAt ? fmtTime(last.clockOutAt) : 'In progress';
-      return `<tr><td>${escapeHtml(e.employeeName)}</td><td>${clockIn}</td><td>${clockOut}</td><td>${fmtDuration(entryHoursMs(e))}</td></tr>`;
+      const stale = entryNeedsHoursReview(e);
+      const clockOut = last && last.clockOutAt ? fmtTime(last.clockOutAt) : (stale ? 'Never clocked out' : 'In progress');
+      const hoursCell = stale
+        ? `<span style="color:var(--red);font-weight:700;" title="This shift has a missing or impossible clock time — its hours aren't counted until it's fixed in Adjust Times.">⚠ Needs review</span>`
+        : fmtDuration(entryHoursMs(e));
+      return `<tr><td>${escapeHtml(e.employeeName)}</td><td>${clockIn}</td><td>${clockOut}</td><td>${hoursCell}</td></tr>`;
     }).join('')}
   </tbody></table>`;
 }
@@ -1618,7 +1678,7 @@ function addDays(dateStr, n){
 function weekEffectiveRate(employeeName, weekMonday, baseRate){
   if(!baseRate) return 0;
   const weekEntries = entries.filter(e=>e.employeeName===employeeName && mondayOf(e.date)===weekMonday);
-  const totalHours = weekEntries.reduce((s,e)=>s+entryHoursMs(e),0)/3600000;
+  const totalHours = weekEntries.reduce((s,e)=>s+entryHoursMsForReport(e),0)/3600000;
   if(totalHours<=40 || totalHours===0) return baseRate;
   const regular = 40, ot = totalHours-40;
   return baseRate * (regular + ot*1.5) / totalHours;
@@ -1637,14 +1697,17 @@ function renderWeeklyReport(){
   const dayLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   let rowsHtml = '';
   names.forEach(name=>{
-    let totalMs = 0;
+    let totalMs = 0, anyStale = false;
     const cells = days.map(d=>{
       const entry = entries.find(e=>e.employeeName===name && e.date===d);
-      const ms = entry ? entryHoursMs(entry) : 0;
+      const stale = entry && entryNeedsHoursReview(entry);
+      if(stale) anyStale = true;
+      const ms = entry ? entryHoursMsForReport(entry) : 0;
       totalMs += ms;
-      return ms>0 ? fmtDuration(ms) : '\u2014';
+      const warn = stale ? `<span style="color:var(--red);" title="A shift this day has a missing or impossible clock time \u2014 needs review in Adjust Times. Any properly closed shifts that day still count.">\u26a0</span>` : '';
+      return (ms>0 ? fmtDuration(ms) : '\u2014') + warn;
     });
-    if(totalMs===0) return;
+    if(totalMs===0 && !anyStale) return;
     rowsHtml += `<tr><td>${escapeHtml(name)}</td>${cells.map(c=>`<td>${c}</td>`).join('')}<td><b>${fmtDuration(totalMs)}</b></td></tr>`;
   });
   const wrap = document.getElementById('weeklyReportBody');
@@ -1668,21 +1731,24 @@ function renderPayrollReport(){
   const names = [...new Set([...employees.map(e=>e.name), ...entries.map(e=>e.employeeName)])].sort((a,b)=>a.localeCompare(b));
   let html = '';
   names.forEach(name=>{
-    let totalMs=0, week1Ms=0, week2Ms=0;
+    let totalMs=0, week1Ms=0, week2Ms=0, anyStale=false;
     const dayRows = days.map((d,i)=>{
       const entry = entries.find(e=>e.employeeName===name && e.date===d);
-      const ms = entry ? entryHoursMs(entry) : 0;
+      const stale = entry && entryNeedsHoursReview(entry);
+      if(stale) anyStale = true;
+      const ms = entry ? entryHoursMsForReport(entry) : 0;
       totalMs += ms;
       if(i<7) week1Ms += ms; else week2Ms += ms;
-      return { d, ms };
+      return { d, ms, stale };
     });
-    if(totalMs===0) return;
+    if(totalMs===0 && !anyStale) return;
     html += `<div class="payroll-page">
       ${reportLetterheadHtml('2-Week Payroll Report')}
       <div class="ph-name">${escapeHtml(name)}</div>
       <div class="ph-period">Pay period: ${fmtDateShort(days[0])} \u2013 ${fmtDateShort(days[13])}</div>
+      ${anyStale ? `<div class="hint" style="color:var(--red);font-weight:700;">\u26a0 One or more days below have a missing or impossible clock time and are excluded from this total \u2014 fix them in Adjust Times before running payroll.</div>` : ''}
       <table class="report-table"><thead><tr><th>Date</th><th>Day</th><th>Hours</th></tr></thead><tbody>
-        ${dayRows.map(r=>`<tr><td>${fmtDateShort(r.d)}</td><td>${new Date(r.d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'})}</td><td>${r.ms>0?fmtDuration(r.ms):'\u2014'}</td></tr>`).join('')}
+        ${dayRows.map(r=>`<tr><td>${fmtDateShort(r.d)}</td><td>${new Date(r.d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'})}</td><td>${r.ms>0?fmtDuration(r.ms):'\u2014'}${r.stale?` <span style="color:var(--red);">\u26a0 needs review</span>`:''}</td></tr>`).join('')}
       </tbody></table>
       <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:13px;">
         <div>Week 1: <b>${fmtDuration(week1Ms)}</b></div>
@@ -1754,6 +1820,7 @@ const OPEN_REPORT_REFRESHERS = {
   modalEmployeeReport: () => renderEmployeeReport(),
   modalDetailedLabor: () => renderDetailedLaborReport(),
   modalJobReport: () => renderJobReport(),
+  modalStaleShifts: () => renderStaleShiftsReport(),
 };
 function refreshOpenReports(){
   Object.keys(OPEN_REPORT_REFRESHERS).forEach(id=>{
@@ -2342,10 +2409,11 @@ function renderEmployeeReport(){
     : `<div class="empty">No jobs logged in this range (shop days only).</div>`;
 
   const weekTotals = {};
-  let grandTotal = 0;
+  let grandTotal = 0, anyStale = false;
   matches.forEach(e=>{
     const wk = mondayOf(e.date);
-    const ms = entryHoursMs(e);
+    if(entryNeedsHoursReview(e)) anyStale = true;
+    const ms = entryHoursMsForReport(e);
     weekTotals[wk] = (weekTotals[wk]||0) + ms;
     grandTotal += ms;
   });
@@ -2364,6 +2432,7 @@ function renderEmployeeReport(){
   const biweeklyTable = `<table class="report-table"><thead><tr><th>Pay period</th><th>Hours</th></tr></thead><tbody>${biweekly.join('')}</tbody></table>`;
 
   wrap.innerHTML = `${letterhead}
+    ${anyStale ? `<div class="hint" style="color:var(--red);font-weight:700;">\u26a0 One or more days in this range have a missing or impossible clock time and are excluded from the totals below \u2014 check Shift Times Needing Review.</div>` : ''}
     <div class="card-eyebrow">Jobs worked (${fmtDateShort(from)} \u2013 ${fmtDateShort(to)})</div>
     ${jobsTable}
     <div class="card-eyebrow" style="margin-top:16px;">Weekly totals</div>
@@ -2459,6 +2528,63 @@ function renderLaborSyncLog(){
 function openSignoffsReport(){
   renderSignoffsReport();
   openModal('modalSignoffsReport');
+}
+// Scans EVERY entry, not just today, for a shift that's still open on a day
+// that's already over — the thing that let Cruz Cota's Sep 10 clock-in balloon
+// to 366+ hours by the time anyone looked at a Weekly/Payroll report three
+// weeks later. "Who's Clocked In" only ever looked at today, so a shift
+// forgotten on a past day was invisible until it had already distorted a
+// report. This is meant to be checked routinely (or right after "everyone's
+// hours didn't get registered" during an update) so these get fixed same-day
+// instead of silently compounding. See project log, 2026-09-26.
+function openStaleShiftsReport(){
+  renderStaleShiftsReport();
+  openModal('modalStaleShifts');
+}
+function renderStaleShiftsReport(){
+  const wrap = document.getElementById('staleShiftsBody');
+  const letterhead = reportLetterheadHtml('Shift Times Needing Review');
+  const flagged = entries.filter(entryNeedsHoursReview).sort((a,b)=>a.date.localeCompare(b.date));
+  if(flagged.length===0){
+    wrap.innerHTML = letterhead + `<div class="empty">None found — every shift's times look right.</div>`;
+    return;
+  }
+  const rows = flagged.map(e=>{
+    const shifts = ensureShifts(e);
+    const brokenIdx = shifts.findIndex(shiftLooksBroken);
+    const broken = shifts[brokenIdx];
+    const isOpen = !broken.clockOutAt;
+    let statusText, badgeText;
+    if(isOpen){
+      const ageDays = Math.floor((Date.now() - new Date(broken.clockInAt))/86400000);
+      statusText = `Clocked in ${fmtTime(broken.clockInAt)}, never clocked out.`;
+      badgeText = ageDays<1 ? 'today' : ageDays+'d open';
+    } else {
+      const ms = new Date(broken.clockOutAt) - new Date(broken.clockInAt);
+      statusText = ms<0
+        ? `Shift ${brokenIdx+1}: clock-out (${fmtTime(broken.clockOutAt)}) is before clock-in (${fmtTime(broken.clockInAt)}).`
+        : `Shift ${brokenIdx+1}: ${fmtDuration(ms)} between clock-in and clock-out — check this is right.`;
+      badgeText = 'check times';
+    }
+    return `<div class="list-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="nm">${escapeHtml(e.employeeName)} &mdash; ${fmtDateShort(e.date)}</div>
+        <span style="color:var(--red);font-weight:700;font-size:12px;">${badgeText}</span>
+      </div>
+      <div style="font-size:12.5px;color:var(--muted);">${statusText} Excluded from report totals until fixed.</div>
+      <button class="btn btn-gold" style="margin-top:2px;" onclick="closeModal('modalStaleShifts');openAdjustTimesFor('${escapeHtml(e.employeeName).replace(/'/g,"\\'")}','${e.date}')">Fix in Adjust Times</button>
+    </div>`;
+  }).join('');
+  wrap.innerHTML = letterhead + `<div class="hint" style="color:var(--red);font-weight:700;margin-bottom:10px;">${flagged.length} entr${flagged.length===1?'y needs':'ies need'} a time fixed before payroll runs.</div>` + rows;
+}
+// Jumps straight into Adjust Times pre-loaded for one employee/date, so
+// fixing something found in the Open Shifts report doesn't require
+// re-typing the name and re-picking the date by hand.
+function openAdjustTimesFor(name, date){
+  openAdjustTimes();
+  document.getElementById('adjustEmpName').value = name;
+  document.getElementById('adjustDate').value = date;
+  loadAdjustEntry();
 }
 function renderSignoffsReport(){
   const wrap = document.getElementById('signoffsReportBody');
@@ -2569,9 +2695,11 @@ function renderMyHoursCalendar(){
   const monthPrefix = `${myHoursCalYear}-${pad(myHoursCalMonth+1)}-`;
 
   const hoursByDay = {};
+  const staleDay = {};
   entries.forEach(e=>{
     if(e.employeeName===currentUser.name && e.date.startsWith(monthPrefix)){
-      hoursByDay[Number(e.date.slice(8,10))] = entryHoursMs(e);
+      hoursByDay[Number(e.date.slice(8,10))] = entryHoursMsForReport(e);
+      if(entryNeedsHoursReview(e)) staleDay[Number(e.date.slice(8,10))] = true;
     }
   });
 
@@ -2580,7 +2708,12 @@ function renderMyHoursCalendar(){
   for(let d=1; d<=daysInMonth; d++){
     const ms = hoursByDay[d];
     const dateStr = `${monthPrefix}${pad(d)}`;
-    const chip = ms ? `<div class="cal-job-chip" style="background:var(--gold);color:var(--black);" onclick="openMyDayDetail('${dateStr}')">${fmtDuration(ms)}</div>` : '';
+    let chip = '';
+    if(staleDay[d]){
+      chip = `<div class="cal-job-chip" style="background:var(--red);color:#fff;" onclick="openMyDayDetail('${dateStr}')" title="This day has a missing or impossible clock time">⚠</div>`;
+    } else if(ms){
+      chip = `<div class="cal-job-chip" style="background:var(--gold);color:var(--black);" onclick="openMyDayDetail('${dateStr}')">${fmtDuration(ms)}</div>`;
+    }
     html += `<div class="cal-day"><div class="cal-daynum">${d}</div>${chip}</div>`;
   }
   document.getElementById('myHoursCalGrid').innerHTML = `<div class="cal-grid">${html}</div>`;
@@ -2589,7 +2722,8 @@ function openMyDayDetail(dateStr){
   const entry = entries.find(e=>e.employeeName===currentUser.name && e.date===dateStr);
   if(!entry) return;
   document.getElementById('myDayDetailDate').textContent = fmtDateLong(dateStr);
-  document.getElementById('myDayDetailTotal').textContent = 'Total: ' + fmtDuration(entryHoursMs(entry));
+  const staleNote = entryNeedsHoursReview(entry) ? ' — ⚠ has a missing or impossible clock time, ask your supervisor to fix this' : '';
+  document.getElementById('myDayDetailTotal').textContent = 'Total: ' + fmtDuration(entryHoursMsForReport(entry)) + staleNote;
   const wrap = document.getElementById('myDayDetailBody');
   if(entry.jobLogs.length===0){
     wrap.innerHTML = `<div class="empty">No jobs logged this day (shop/office time only).</div>`;
@@ -2607,17 +2741,21 @@ function renderMySignoff(){
   const to = document.getElementById('mySignoffTo').value;
   const wrap = document.getElementById('mySignoffBody');
   const mine = entries.filter(e=>e.employeeName===currentUser.name && (!from||e.date>=from) && (!to||e.date<=to)).sort((a,b)=>a.date.localeCompare(b.date));
-  let totalMs = 0;
+  let totalMs = 0, anyStale = false;
   const rows = mine.map(e=>{
-    const ms = entryHoursMs(e);
+    const stale = entryNeedsHoursReview(e);
+    if(stale) anyStale = true;
+    const ms = entryHoursMsForReport(e);
     totalMs += ms;
-    return `<tr><td>${fmtDateShort(e.date)}</td><td>${fmtDuration(ms)}</td></tr>`;
+    return `<tr><td>${fmtDateShort(e.date)}</td><td>${fmtDuration(ms)}${stale?` <span style="color:var(--red);">\u26a0 has a missing or impossible clock time</span>`:''}</td></tr>`;
   }).join('');
   const priorSignoffs = signoffs.filter(s=>s.employeeName===currentUser.name).sort((a,b)=>b.signedAt.localeCompare(a.signedAt)).slice(0,5);
   wrap.innerHTML = `
     ${mine.length ? `<table class="report-table"><thead><tr><th>Date</th><th>Hours</th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="empty">No hours logged in this range.</div>`}
     <div class="hint" style="margin-top:10px;font-weight:700;color:var(--ink);">Total: ${fmtDuration(totalMs)}</div>
-    <button class="btn btn-gold" style="margin-top:14px;" onclick="certifyMyHours('${from}','${to}',${totalMs})">I certify these hours are accurate</button>
+    ${anyStale
+      ? `<div class="hint" style="color:var(--red);font-weight:700;">\u26a0 One or more days above have a missing or impossible clock time. Ask your supervisor to fix this in Adjust Times before you certify.</div>`
+      : `<button class="btn btn-gold" style="margin-top:14px;" onclick="certifyMyHours('${from}','${to}',${totalMs})">I certify these hours are accurate</button>`}
     ${priorSignoffs.length ? `<div class="card-eyebrow" style="margin-top:18px;">Your recent sign-offs</div>` + priorSignoffs.map(s=>`<div class="hint" style="margin-top:0;">${fmtDateShort(s.from)} \u2013 ${fmtDateShort(s.to)}: signed ${fmtDateShort(s.signedAt.slice(0,10))}</div>`).join('') : ''}`;
 }
 async function certifyMyHours(from, to, totalMs){
@@ -2639,7 +2777,7 @@ function renderDetailedLaborReport(){
   dayEntries.forEach(e=>{ (byDate[e.date] = byDate[e.date]||[]).push(e); });
   const dates = Object.keys(byDate).sort();
 
-  let grandTotalMs = 0, grandTotalCost = 0;
+  let grandTotalMs = 0, grandTotalCost = 0, anyStaleOverall = false;
   let html = '';
   dates.forEach(date=>{
     let dayRows = '';
@@ -2649,19 +2787,22 @@ function renderDetailedLaborReport(){
       const baseRate = emp ? (emp.hourlyRate||0) : 0;
       const rate = weekEffectiveRate(e.employeeName, mondayOf(e.date), baseRate);
       const otTag = rate>baseRate ? ` <span style="color:var(--amber);font-weight:700;">(OT wk)</span>` : '';
-      const totalMs = entryHoursMs(e);
+      const stale = entryNeedsHoursReview(e);
+      if(stale) anyStaleOverall = true;
+      const staleTag = stale ? ` <span style="color:var(--red);font-weight:700;">(⚠ needs review)</span>` : '';
+      const totalMs = entryHoursMsForReport(e);
       let attributedMs = 0;
       e.jobLogs.forEach(jl=>{
         const ms = (jl.endedAt?new Date(jl.endedAt):new Date()) - new Date(jl.startedAt);
         attributedMs += ms;
         const cost = ms/3600000*rate;
-        dayRows += `<tr><td>${escapeHtml(e.employeeName)}${otTag}</td><td>${escapeHtml(jl.jobName)}</td><td>${fmtDuration(ms)}</td><td>$${cost.toFixed(2)}</td></tr>`;
+        dayRows += `<tr><td>${escapeHtml(e.employeeName)}${otTag}${staleTag}</td><td>${escapeHtml(jl.jobName)}</td><td>${fmtDuration(ms)}</td><td>$${cost.toFixed(2)}</td></tr>`;
         dayMs += ms; dayCost += cost;
       });
       const remainderMs = totalMs - attributedMs;
       if(remainderMs > 60000){
         const cost = remainderMs/3600000*rate;
-        dayRows += `<tr><td>${escapeHtml(e.employeeName)}${otTag}</td><td style="color:var(--muted);">Shop / Unassigned</td><td>${fmtDuration(remainderMs)}</td><td>$${cost.toFixed(2)}</td></tr>`;
+        dayRows += `<tr><td>${escapeHtml(e.employeeName)}${otTag}${staleTag}</td><td style="color:var(--muted);">Shop / Unassigned</td><td>${fmtDuration(remainderMs)}</td><td>$${cost.toFixed(2)}</td></tr>`;
         dayMs += remainderMs; dayCost += cost;
       }
     });
@@ -2673,7 +2814,9 @@ function renderDetailedLaborReport(){
       </tbody></table>`;
   });
 
-  wrap.innerHTML = `${letterhead}${html}
+  wrap.innerHTML = `${letterhead}
+    ${anyStaleOverall ? `<div class="hint" style="color:var(--red);font-weight:700;">\u26a0 One or more entries above have a missing or impossible clock time and are excluded from these totals \u2014 check Shift Times Needing Review.</div>` : ''}
+    ${html}
     <div class="hint" style="margin-top:14px;font-weight:700;color:var(--ink);">Grand total (${fmtDateShort(from)} \u2013 ${fmtDateShort(to)}): ${fmtDuration(grandTotalMs)} &mdash; $${grandTotalCost.toFixed(2)}</div>`;
 }
 
