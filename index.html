@@ -312,6 +312,7 @@ main.content{padding:16px 14px 4px;}
       <div class="user-pill">
         <button id="jobCalendarBtn" onclick="openJobCalendar()" class="theme-toggle-btn" title="Job Calendar"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--gold-light);width:16px;height:16px;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>
         <button id="myHoursBtn" onclick="openMySignoff()" class="theme-toggle-btn" title="My Hours"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--gold-light);width:16px;height:16px;"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></button>
+        <button id="scopeSheetsBtn" onclick="openScopeSheetsHub()" class="theme-toggle-btn" title="Scope Sheets"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--gold-light);width:16px;height:16px;"><path d="M9 2h6a1 1 0 0 1 1 1v1h1a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1V3a1 1 0 0 1 1-1z"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="16" y2="15"/><line x1="8" y1="19" x2="12" y2="19"/></svg></button>
         <button id="techHelpBtn" onclick="openHelpTech()" class="theme-toggle-btn" title="Help &amp; guide"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--gold-light);width:16px;height:16px;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
         <button id="darkModeToggle" onclick="toggleDarkMode()" class="theme-toggle-btn" title="Toggle dark mode"></button>
         <button id="userBadge" onclick="switchEmployee()" class="user-avatar" title="Switch employee"></button>
@@ -751,6 +752,31 @@ main.content{padding:16px 14px 4px;}
   <div id="myDayDetailBody"></div>
 </div></div>
 
+<!-- Scope of Work Sheets: search/open by job, open to every signed-in employee -->
+<div class="overlay" id="modalScopeSheetsHub"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Scope Sheets</div><div class="sheet-sub">Room scope, quantities, and readings by job</div></div>
+    <button class="close-x" onclick="closeModal('modalScopeSheetsHub')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="field">
+    <label>Find or start a job's scope sheet</label>
+    <input id="scopeSheetJobSearch" list="scopeSheetJobList" placeholder="Type a job/customer name" oninput="renderScopeSheetsHubList()">
+    <datalist id="scopeSheetJobList"></datalist>
+  </div>
+  <div id="scopeSheetsHubBody"></div>
+</div></div>
+
+<!-- One job's full scope sheet -->
+<div class="overlay" id="modalScopeSheetDetail"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title" id="scopeSheetDetailTitle">Scope Sheet</div><div class="sheet-sub" id="scopeSheetDetailSub"></div></div>
+    <button class="close-x" onclick="closeScopeSheetDetail()"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div id="scopeSheetDetailBody"></div>
+</div></div>
+
 <div class="overlay" id="modalAdjustTimes"><div class="sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-head">
@@ -841,6 +867,7 @@ let employees = DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate
 let settings = { loginPin: '1234' };
 let auditLog = [];
 let signoffs = [];
+let scopeSheets = []; // one per job: header info + an array of rooms, each with its own scope + a dated readings log
 let todayEntry = null; // current user's entry for today
 let editingVehicle = null;
 let tickHandle = null;
@@ -914,6 +941,7 @@ async function loadInitialData(){
     settings = (data.settings && data.settings.loginPin) ? data.settings : { loginPin: DEFAULT_LOGIN_PIN };
     auditLog = data.auditLog || [];
     signoffs = data.signoffs || [];
+    scopeSheets = data.scopeSheets || [];
     fetchJobTrackerNames();
   }catch(e){
     console.error('load failed', e);
@@ -1027,12 +1055,21 @@ async function refreshDataFromServer(){
     if(data.settings && data.settings.loginPin) settings = data.settings;
     if(data.auditLog) auditLog = data.auditLog;
     if(data.signoffs) signoffs = data.signoffs;
+    if(data.scopeSheets) scopeSheets = data.scopeSheets;
     // Re-find todayEntry by id in the fresh data rather than trusting the
     // old object reference, so in-progress local state stays pointed at
     // the right (now updated) record instead of a stale clone.
     if(todayEntry){
       const fresh = entries.find(e=>e.id===todayEntry.id);
       if(fresh) todayEntry = fresh;
+    }
+    // A scope sheet can have more than one tech adding rooms/readings to it
+    // at once — if the one currently open is still around in the fresh
+    // data, keep viewing that same object (not a stale clone) so someone
+    // else's update appears without needing to close and reopen it.
+    if(currentScopeSheet){
+      const freshSheet = scopeSheets.find(s=>s.id===currentScopeSheet.id);
+      if(freshSheet){ currentScopeSheet = freshSheet; renderScopeSheetDetail(); }
     }
   }catch(e){
     console.warn('Background refresh failed — will retry on the next tick', e);
@@ -1954,6 +1991,327 @@ async function saveSignoffs(){
     if(!res || !res.ok){ showToast('Save failed — backend rejected the update'); return false; }
     return true;
   }catch(e){ showToast('Save failed — check your connection'); return false; }
+}
+
+/* ============ SCOPE OF WORK SHEETS ============ */
+// Open to every signed-in employee, not gated behind the admin permissions
+// that guard Reports/Adjust Times — this is field documentation, not
+// payroll, and everyone who scopes a job should be able to add to it.
+//
+// Data shape: one record per job, with a list of rooms. Each room holds its
+// relatively-static scope (dimensions, affected materials, work to perform)
+// plus two separately-growing, dated, attributed lists: scopeLines (the
+// "Exact Scope / Quantities" line items from the paper form) and readings
+// (moisture checks logged over multiple visits, e.g. under "Monitor"). Every
+// add/edit stamps who did it and when, which is what drives both the
+// per-room "last updated" badge and the color-coded chronological trail.
+//
+// Saves reuse the same fetch-fresh/merge-one-record/save-back pattern as
+// saveEntriesMerged, since — unlike Adjust Times — several people may have
+// this same job's sheet open and editing at once.
+const SCOPE_COLOR_PALETTE = ['#D64550','#2A9D8F','#E76F51','#457B9D','#8E44AD','#2E86AB','#B5838D','#588157','#BC6C25','#6D6875','#C9184A','#3A86FF','#0B7285','#A44A3F'];
+function employeeColor(name){
+  const s = String(name||'');
+  let hash = 0;
+  for(let i=0;i<s.length;i++) hash = (hash*31 + s.charCodeAt(i)) >>> 0;
+  return SCOPE_COLOR_PALETTE[hash % SCOPE_COLOR_PALETTE.length];
+}
+function attributionBadge(name, iso){
+  if(!name) return '';
+  return `<span style="background:${employeeColor(name)};color:#fff;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;white-space:nowrap;">${escapeHtml(name)} — ${fmtDateShort(iso.slice(0,10))}</span>`;
+}
+const SCOPE_MATERIAL_KEYS = [['drywall','Drywall'],['ceiling','Ceiling'],['insulation','Insulation'],['flooring','Flooring'],['baseboard','Baseboard'],['cabinets','Cabinets'],['framing','Framing'],['contents','Contents'],['trimDoor','Trim / door'],['tile','Tile']];
+const SCOPE_WORK_KEYS = [['protect','Protect'],['extract','Extract'],['contain','Contain'],['detach','Detach'],['remove','Remove'],['dryInPlace','Dry in place'],['hepaVac','HEPA vac'],['cleanWipe','Clean / wipe'],['antimicrobial','Antimicrobial'],['sandSeal','Sand / seal'],['monitor','Monitor']];
+function newScopeRoom(){
+  const materials = { otherText:'' }; SCOPE_MATERIAL_KEYS.forEach(([k])=>materials[k]=false); materials.other=false;
+  const work = {}; SCOPE_WORK_KEYS.forEach(([k])=>work[k]=false);
+  return {
+    id: uid('RM'),
+    name: '',
+    lengthFt:'', widthFt:'', heightFt:'',
+    affectedArea:'',
+    materials, work,
+    equipment:'',
+    photosNote: `See True Restore for photos and current readings — dated ${fmtDateShort(todayStr())}`,
+    scopeLines: [],
+    readings: [],
+    createdBy: currentUser.name, createdAt: nowIso(),
+    lastUpdatedBy: currentUser.name, lastUpdatedAt: nowIso()
+  };
+}
+// Whoever has a job log for this job name today gets suggested as the
+// technician(s) — saves retyping names already captured by the time clock.
+function techniciansForJobToday(jobName){
+  const names = new Set();
+  entries.filter(e=>e.date===todayStr()).forEach(e=>{
+    (e.jobLogs||[]).forEach(jl=>{ if(jl.jobName && jl.jobName.toLowerCase()===jobName.toLowerCase()) names.add(e.employeeName); });
+  });
+  return [...names].sort((a,b)=>a.localeCompare(b)).join(', ');
+}
+async function saveScopeSheetsMerged(sheetsToUpsert){
+  let latest;
+  try{
+    const fresh = await apiGetAll();
+    latest = fresh.scopeSheets || [];
+  }catch(e){
+    latest = [...scopeSheets];
+  }
+  sheetsToUpsert.forEach(sheet=>{
+    const idx = latest.findIndex(s=>s.id===sheet.id);
+    if(idx===-1) latest.push(sheet); else latest[idx] = sheet;
+  });
+  try{
+    const res = await apiPost('saveScopeSheets', latest);
+    if(!res || !res.ok){ showToast('Save failed — backend rejected the update'); return false; }
+    scopeSheets = latest;
+    return true;
+  }catch(e){ console.error('save scope sheets failed', e); showToast('Save failed — check your connection'); return false; }
+}
+let currentScopeSheet = null;
+let scopeRoomExpanded = new Set();
+function openScopeSheetsHub(){
+  document.getElementById('scopeSheetJobList').innerHTML = allJobNames().map(n=>`<option value="${escapeHtml(n)}">`).join('');
+  document.getElementById('scopeSheetJobSearch').value = '';
+  renderScopeSheetsHubList();
+  openModal('modalScopeSheetsHub');
+}
+function renderScopeSheetsHubList(){
+  const qRaw = (document.getElementById('scopeSheetJobSearch').value||'').trim();
+  const q = qRaw.toLowerCase();
+  const escJs = str => String(str).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+  const wrap = document.getElementById('scopeSheetsHubBody');
+  const matches = scopeSheets.filter(s=>!q || s.jobName.toLowerCase().includes(q)).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  let html = '';
+  if(q && !scopeSheets.some(s=>s.jobName.toLowerCase()===q)){
+    html += `<button class="btn btn-gold" style="margin-bottom:10px;" onclick="openScopeSheetForJob('${escJs(qRaw)}')">+ Start scope sheet for "${escapeHtml(qRaw)}"</button>`;
+  }
+  if(matches.length===0 && !q){
+    html += `<div class="empty">No scope sheets yet — search a job above to start one.</div>`;
+  } else {
+    html += matches.map(s=>{
+      const roomCount = s.rooms.length;
+      return `<div class="list-row" onclick="openScopeSheetForJob('${escJs(s.jobName)}')" style="cursor:pointer;">
+        <div>
+          <div class="nm">${escapeHtml(s.jobName)}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">${roomCount} room${roomCount===1?'':'s'} · updated ${fmtDateShort((s.updatedAt||s.date).slice(0,10))}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  wrap.innerHTML = html;
+}
+function openScopeSheetForJob(jobName){
+  jobName = (jobName||'').trim();
+  if(!jobName) return;
+  let sheet = scopeSheets.find(s=>s.jobName.toLowerCase()===jobName.toLowerCase());
+  if(!sheet){
+    sheet = {
+      id: uid('SS'),
+      jobName,
+      propertyAddress:'',
+      date: todayStr(),
+      technicians: techniciansForJobToday(jobName),
+      rooms: [],
+      createdBy: currentUser.name, createdAt: nowIso(), updatedAt: nowIso()
+    };
+  }
+  currentScopeSheet = sheet;
+  scopeRoomExpanded = new Set();
+  closeModal('modalScopeSheetsHub');
+  renderScopeSheetDetail();
+  openModal('modalScopeSheetDetail');
+}
+function closeScopeSheetDetail(){
+  currentScopeSheet = null;
+  closeModal('modalScopeSheetDetail');
+}
+// Every mutation funnels through here: stamps who/when on the room (and the
+// sheet), saves it, and re-renders. `auditSummary`, when given, also adds a
+// line to the shared Edit History log (reused from Adjust Times) — used for
+// structural changes (add/delete a room, a reading, a scope line) rather
+// than every keystroke, so that log doesn't get flooded with noise while
+// still keeping a real trail of who added or removed what.
+async function commitScopeSheetChange(room, auditSummary){
+  if(!currentScopeSheet) return;
+  currentScopeSheet.updatedAt = nowIso();
+  if(room){
+    room.lastUpdatedBy = currentUser.name;
+    room.lastUpdatedAt = nowIso();
+  }
+  const isNew = !scopeSheets.some(s=>s.id===currentScopeSheet.id);
+  const ok = await saveScopeSheetsMerged([currentScopeSheet]);
+  if(ok){
+    const summary = isNew ? `Started scope sheet for ${currentScopeSheet.jobName}` : auditSummary;
+    if(summary) logAudit(currentScopeSheet.jobName, currentScopeSheet.date, [summary]);
+  } else {
+    showToast('Change not saved — check your connection and try again');
+  }
+  renderScopeSheetDetail();
+  return ok;
+}
+function updateScopeSheetField(field, value){
+  if(!currentScopeSheet) return;
+  currentScopeSheet[field] = value;
+  commitScopeSheetChange(null);
+}
+function addScopeRoom(){
+  const room = newScopeRoom();
+  currentScopeSheet.rooms.push(room);
+  scopeRoomExpanded.add(room.id);
+  commitScopeSheetChange(room, `Added room to ${currentScopeSheet.jobName}`);
+}
+function deleteScopeRoom(roomId){
+  const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
+  if(!room) return;
+  if(!confirm(`Delete "${room.name||'this room'}"? This removes its scope, readings, and photos note.`)) return;
+  currentScopeSheet.rooms = currentScopeSheet.rooms.filter(r=>r.id!==roomId);
+  commitScopeSheetChange(null, `Deleted room "${room.name||'(unnamed)'}" from ${currentScopeSheet.jobName}`);
+}
+function toggleScopeRoomExpanded(roomId){
+  if(scopeRoomExpanded.has(roomId)) scopeRoomExpanded.delete(roomId); else scopeRoomExpanded.add(roomId);
+  renderScopeSheetDetail();
+}
+function updateScopeRoomField(roomId, field, value){
+  const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
+  if(!room) return;
+  room[field] = value;
+  commitScopeSheetChange(room);
+}
+function updateScopeRoomCheckbox(roomId, group, key, checked){
+  const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
+  if(!room) return;
+  room[group][key] = checked;
+  commitScopeSheetChange(room);
+}
+function updateScopeRoomOtherText(roomId, value){
+  const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
+  if(!room) return;
+  room.materials.otherText = value;
+  commitScopeSheetChange(room);
+}
+function addScopeLine(roomId){
+  const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
+  if(!room) return;
+  const desc = document.getElementById(`scopeLineDesc_${roomId}`).value.trim();
+  const qty = document.getElementById(`scopeLineQty_${roomId}`).value.trim();
+  const unit = document.getElementById(`scopeLineUnit_${roomId}`).value.trim();
+  if(!desc){ showToast('Enter a location/material/action first'); return; }
+  room.scopeLines.push({ id: uid('SL'), text: desc, qty, unit, createdBy: currentUser.name, createdAt: nowIso() });
+  commitScopeSheetChange(room, `Added scope line "${desc}" to ${room.name||'a room'} (${currentScopeSheet.jobName})`);
+}
+function deleteScopeLine(roomId, lineId){
+  const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
+  if(!room) return;
+  const line = room.scopeLines.find(l=>l.id===lineId);
+  if(!confirm(`Delete "${line ? line.text : 'this line'}"?`)) return;
+  room.scopeLines = room.scopeLines.filter(l=>l.id!==lineId);
+  commitScopeSheetChange(room, `Deleted scope line "${line?line.text:''}" from ${room.name||'a room'} (${currentScopeSheet.jobName})`);
+}
+function addScopeReading(roomId){
+  const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
+  if(!room) return;
+  const moisture = document.getElementById(`scopeReadingMoisture_${roomId}`).value.trim();
+  const note = document.getElementById(`scopeReadingNote_${roomId}`).value.trim();
+  if(!moisture){ showToast('Enter a moisture reading first'); return; }
+  room.readings.push({ id: uid('RD'), moisture, note, createdBy: currentUser.name, createdAt: nowIso() });
+  commitScopeSheetChange(room, `Logged reading ${moisture} for ${room.name||'a room'} (${currentScopeSheet.jobName})`);
+}
+function deleteScopeReading(roomId, readingId){
+  const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
+  if(!room) return;
+  if(!confirm('Delete this reading?')) return;
+  const reading = room.readings.find(r=>r.id===readingId);
+  room.readings = room.readings.filter(r=>r.id!==readingId);
+  commitScopeSheetChange(room, `Deleted a reading (${reading?reading.moisture:''}) from ${room.name||'a room'} (${currentScopeSheet.jobName})`);
+}
+function renderScopeSheetDetail(){
+  if(!currentScopeSheet) return;
+  const s = currentScopeSheet;
+  document.getElementById('scopeSheetDetailTitle').textContent = s.jobName;
+  document.getElementById('scopeSheetDetailSub').textContent = `${s.rooms.length} room${s.rooms.length===1?'':'s'}`;
+  const roomsHtml = s.rooms.map(renderScopeRoomCard).join('') || `<div class="empty">No rooms yet — tap "+ Add Room" to start.</div>`;
+  document.getElementById('scopeSheetDetailBody').innerHTML = `
+    ${reportLetterheadHtml('Room Scope Sheet')}
+    <div class="field"><label>Property address</label><input value="${escapeHtml(s.propertyAddress)}" placeholder="Address" onchange="updateScopeSheetField('propertyAddress', this.value)"></div>
+    <div style="display:flex;gap:8px;">
+      <div class="field" style="flex:1;"><label>Date</label><input type="date" value="${s.date}" onchange="updateScopeSheetField('date', this.value)"></div>
+      <div class="field" style="flex:2;"><label>Technician(s)</label><input value="${escapeHtml(s.technicians)}" placeholder="Names" onchange="updateScopeSheetField('technicians', this.value)"></div>
+    </div>
+    <div class="card-eyebrow" style="margin-top:10px;">Rooms</div>
+    ${roomsHtml}
+    <button class="btn btn-gold" style="margin-top:6px;" onclick="addScopeRoom()">+ Add Room</button>
+    <div class="btn-row" style="margin-top:16px;">
+      <button class="btn btn-ghost" onclick="printActiveModal()">Print</button>
+      <button class="btn btn-black" onclick="closeScopeSheetDetail()">Done</button>
+    </div>`;
+}
+function renderScopeRoomCard(room){
+  const expanded = scopeRoomExpanded.has(room.id);
+  const badge = attributionBadge(room.lastUpdatedBy, room.lastUpdatedAt);
+  if(!expanded){
+    return `<div class="list-row" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:4px;" onclick="toggleScopeRoomExpanded('${room.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="nm">${escapeHtml(room.name)||'<span style="color:var(--muted);">Untitled room</span>'}</div>
+        ${badge}
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);">${room.readings.length} reading${room.readings.length===1?'':'s'} · ${room.scopeLines.length} scope line${room.scopeLines.length===1?'':'s'}</div>
+    </div>`;
+  }
+  const materialsHtml = SCOPE_MATERIAL_KEYS.map(([k,label])=>`
+    <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;padding:3px 0;"><input type="checkbox" ${room.materials[k]?'checked':''} onchange="updateScopeRoomCheckbox('${room.id}','materials','${k}',this.checked)"> ${label}</label>`).join('');
+  const otherHtml = `<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;padding:3px 0;"><input type="checkbox" ${room.materials.other?'checked':''} onchange="updateScopeRoomCheckbox('${room.id}','materials','other',this.checked)"> Other</label>
+    ${room.materials.other ? `<input style="margin-top:4px;" placeholder="Describe" value="${escapeHtml(room.materials.otherText)}" onchange="updateScopeRoomOtherText('${room.id}',this.value)">` : ''}`;
+  const workHtml = SCOPE_WORK_KEYS.map(([k,label])=>`
+    <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;padding:3px 0;"><input type="checkbox" ${room.work[k]?'checked':''} onchange="updateScopeRoomCheckbox('${room.id}','work','${k}',this.checked)"> ${label}</label>`).join('');
+  const linesHtml = room.scopeLines.map(l=>`
+    <div class="list-row">
+      <div><div class="nm">${escapeHtml(l.text)}</div><div style="font-size:11px;color:var(--muted);">${escapeHtml(l.qty||'')} ${escapeHtml(l.unit||'')}</div></div>
+      <button class="del-btn" onclick="deleteScopeLine('${room.id}','${l.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+    </div>`).join('') || `<div class="empty">No lines yet.</div>`;
+  const readingsHtml = room.readings.slice().sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).map(r=>`
+    <div class="list-row">
+      <div><div class="nm">${escapeHtml(r.moisture)}${r.note?` — ${escapeHtml(r.note)}`:''}</div></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        ${attributionBadge(r.createdBy, r.createdAt)}
+        <button class="del-btn" onclick="deleteScopeReading('${room.id}','${r.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </div>
+    </div>`).join('') || `<div class="empty">No readings logged yet.</div>`;
+  return `<div class="card" style="padding:14px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+      <input style="font-weight:700;flex:1;" placeholder="Room / area name" value="${escapeHtml(room.name)}" onchange="updateScopeRoomField('${room.id}','name',this.value)">
+      <button class="btn btn-ghost" style="width:auto;padding:6px 10px;" onclick="toggleScopeRoomExpanded('${room.id}')">Collapse</button>
+    </div>
+    <div style="margin:6px 0;">${badge}</div>
+    <div style="display:flex;gap:6px;margin-top:8px;">
+      <div class="field" style="flex:1;margin-bottom:8px;"><label>L (ft)</label><input type="number" value="${room.lengthFt}" onchange="updateScopeRoomField('${room.id}','lengthFt',this.value)"></div>
+      <div class="field" style="flex:1;margin-bottom:8px;"><label>W (ft)</label><input type="number" value="${room.widthFt}" onchange="updateScopeRoomField('${room.id}','widthFt',this.value)"></div>
+      <div class="field" style="flex:1;margin-bottom:8px;"><label>H (ft)</label><input type="number" value="${room.heightFt}" onchange="updateScopeRoomField('${room.id}','heightFt',this.value)"></div>
+    </div>
+    <div class="field"><label>Affected SF / LF</label><input value="${escapeHtml(room.affectedArea)}" placeholder="e.g. 120 SF" onchange="updateScopeRoomField('${room.id}','affectedArea',this.value)"></div>
+    <div class="card-eyebrow" style="margin-top:10px;">Affected materials</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;">${materialsHtml}</div>
+    ${otherHtml}
+    <div class="card-eyebrow" style="margin-top:10px;">Work to perform</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;">${workHtml}</div>
+    <div class="card-eyebrow" style="margin-top:10px;">Exact scope / quantities</div>
+    ${linesHtml}
+    <div style="display:flex;gap:6px;margin-top:6px;">
+      <input id="scopeLineDesc_${room.id}" style="flex:2;" placeholder="Location / material / action">
+      <input id="scopeLineQty_${room.id}" style="flex:1;" placeholder="Qty">
+      <input id="scopeLineUnit_${room.id}" style="flex:1;" placeholder="Unit">
+    </div>
+    <button class="btn btn-ghost" style="margin-top:6px;" onclick="addScopeLine('${room.id}')">+ Add line</button>
+    <div class="card-eyebrow" style="margin-top:10px;">Readings (moisture, over time)</div>
+    ${readingsHtml}
+    <div style="display:flex;gap:6px;margin-top:6px;">
+      <input id="scopeReadingMoisture_${room.id}" style="flex:1;" placeholder="Moisture %">
+      <input id="scopeReadingNote_${room.id}" style="flex:2;" placeholder="Note (optional)">
+    </div>
+    <button class="btn btn-ghost" style="margin-top:6px;" onclick="addScopeReading('${room.id}')">+ Add reading</button>
+    <div class="field" style="margin-top:10px;"><label>Equipment</label><input value="${escapeHtml(room.equipment)}" placeholder="e.g. 2 air movers, 1 dehu" onchange="updateScopeRoomField('${room.id}','equipment',this.value)"></div>
+    <div class="field"><label>Photos</label><input value="${escapeHtml(room.photosNote)}" onchange="updateScopeRoomField('${room.id}','photosNote',this.value)"></div>
+    <button class="btn btn-red" style="margin-top:4px;" onclick="deleteScopeRoom('${room.id}')">Delete this room</button>
+  </div>`;
 }
 
 function renderSetupScreen(failed){
