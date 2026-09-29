@@ -297,6 +297,12 @@ main.content{padding:16px 14px 4px;}
   body.printing-overlay input[type=date],
   body.printing-overlay .field label{ display:none !important; }
   .payroll-page{ break-after:page; border:none; }
+  /* Scope Sheet: print the compact drying-log report, not the live edit form */
+  #scopeSheetPrintArea{ display:none; }
+  body.printing-scope-report #scopeSheetDetailBody{ display:none !important; }
+  body.printing-scope-report #scopeSheetPrintArea{ display:block !important; }
+  .scope-print-room{ break-inside:avoid; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--line); }
+  .scope-print-room:last-child{ border-bottom:none; }
 }
 </style>
 </head>
@@ -775,6 +781,7 @@ main.content{padding:16px 14px 4px;}
     <button class="close-x" onclick="closeScopeSheetDetail()"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div id="scopeSheetDetailBody"></div>
+  <div id="scopeSheetPrintArea"></div>
 </div></div>
 
 <div class="overlay" id="modalAdjustTimes"><div class="sheet">
@@ -803,7 +810,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-09-22T00";
+const BUILD_ID = "2026-09-28T23";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -1069,7 +1076,7 @@ async function refreshDataFromServer(){
     // else's update appears without needing to close and reopen it.
     if(currentScopeSheet){
       const freshSheet = scopeSheets.find(s=>s.id===currentScopeSheet.id);
-      if(freshSheet){ currentScopeSheet = freshSheet; renderScopeSheetDetail(); }
+      if(freshSheet){ currentScopeSheet = freshSheet; maybeRenderScopeSheetDetail(); }
     }
   }catch(e){
     console.warn('Background refresh failed — will retry on the next tick', e);
@@ -2146,12 +2153,53 @@ async function commitScopeSheetChange(room, auditSummary){
   } else {
     showToast('Change not saved — check your connection and try again');
   }
-  renderScopeSheetDetail();
+  maybeRenderScopeSheetDetail();
   return ok;
 }
+// The whole sheet re-renders from scratch on every change (add a room,
+// commit a field, a background sync from another device) — simple, but it
+// used to also wipe out whatever someone was mid-typing into a field that
+// hadn't been saved yet (e.g. entering L, then W, then H back-to-back, or
+// a moisture reading while the 30-second background refresh happened to
+// land). Now a re-render is skipped entirely while any input inside this
+// sheet has focus, and gets caught up automatically the moment focus
+// leaves — so nobody gets "kicked out" mid-entry, and the display still
+// catches up (badges, other people's edits) as soon as they tab away.
+let scopeSheetRenderPending = false;
+function scopeModalHasFocus(){
+  const modal = document.getElementById('modalScopeSheetDetail');
+  const ae = document.activeElement;
+  return !!(modal && ae && modal.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName));
+}
+function maybeRenderScopeSheetDetail(){
+  if(scopeModalHasFocus()){ scopeSheetRenderPending = true; return; }
+  scopeSheetRenderPending = false;
+  renderScopeSheetDetail();
+}
+(function(){
+  const modal = document.getElementById('modalScopeSheetDetail');
+  if(!modal) return;
+  modal.addEventListener('focusout', function(){
+    setTimeout(function(){
+      if(scopeSheetRenderPending && !scopeModalHasFocus()) renderScopeSheetDetail();
+    }, 0);
+  });
+})();
 function updateScopeSheetField(field, value){
   if(!currentScopeSheet) return;
   currentScopeSheet[field] = value;
+  commitScopeSheetChange(null);
+}
+// Technicians used to be a free-typed name field — easy to misspell and hard
+// to search on later. Now it's a checkbox pick from the real employee list,
+// still stored as the same comma-joined string so nothing else downstream
+// (printing, the hub list) needs to know it changed.
+function toggleScopeTechnician(name, checked){
+  if(!currentScopeSheet) return;
+  let list = (currentScopeSheet.technicians||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(checked){ if(!list.includes(name)) list.push(name); }
+  else { list = list.filter(n=>n!==name); }
+  currentScopeSheet.technicians = list.join(', ');
   commitScopeSheetChange(null);
 }
 function addScopeRoom(){
@@ -2230,18 +2278,21 @@ function renderScopeSheetDetail(){
   document.getElementById('scopeSheetDetailTitle').textContent = s.jobName;
   document.getElementById('scopeSheetDetailSub').textContent = `${s.rooms.length} room${s.rooms.length===1?'':'s'}`;
   const roomsHtml = s.rooms.map(renderScopeRoomCard).join('') || `<div class="empty">No rooms yet — tap "+ Add Room" to start.</div>`;
+  const techList = (s.technicians||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const techNames = [...new Set([...employees.filter(e=>!e.archived).map(e=>e.name), ...techList])].sort((a,b)=>a.localeCompare(b));
+  const techHtml = techNames.map(name=>`
+    <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;padding:3px 0;"><input type="checkbox" ${techList.includes(name)?'checked':''} onchange="toggleScopeTechnician('${name.replace(/'/g,"\\'")}',this.checked)"> ${escapeHtml(name)}</label>`).join('');
   document.getElementById('scopeSheetDetailBody').innerHTML = `
     ${reportLetterheadHtml('Room Scope Sheet')}
     <div class="field"><label>Property address</label><input value="${escapeHtml(s.propertyAddress)}" placeholder="Address" onchange="updateScopeSheetField('propertyAddress', this.value)"></div>
-    <div style="display:flex;gap:8px;">
-      <div class="field" style="flex:1;"><label>Date</label><input type="date" value="${s.date}" onchange="updateScopeSheetField('date', this.value)"></div>
-      <div class="field" style="flex:2;"><label>Technician(s)</label><input value="${escapeHtml(s.technicians)}" placeholder="Names" onchange="updateScopeSheetField('technicians', this.value)"></div>
-    </div>
+    <div class="field"><label>Date</label><input type="date" value="${s.date}" onchange="updateScopeSheetField('date', this.value)"></div>
+    <div class="card-eyebrow" style="margin-top:10px;">Technician(s)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;">${techHtml || '<div class="empty">No employees on file yet.</div>'}</div>
     <div class="card-eyebrow" style="margin-top:10px;">Rooms</div>
     ${roomsHtml}
     <button class="btn btn-gold" style="margin-top:6px;" onclick="addScopeRoom()">+ Add Room</button>
     <div class="btn-row" style="margin-top:16px;">
-      <button class="btn btn-ghost" onclick="printActiveModal()">Print</button>
+      <button class="btn btn-ghost" onclick="printScopeSheetReport()">Print</button>
       <button class="btn btn-black" onclick="closeScopeSheetDetail()">Done</button>
     </div>`;
 }
@@ -2312,6 +2363,107 @@ function renderScopeRoomCard(room){
     <div class="field"><label>Photos</label><input value="${escapeHtml(room.photosNote)}" onchange="updateScopeRoomField('${room.id}','photosNote',this.value)"></div>
     <button class="btn btn-red" style="margin-top:4px;" onclick="deleteScopeRoom('${room.id}')">Delete this room</button>
   </div>`;
+}
+
+/* ---- Scope Sheet printing: a compact Drying Log, not the live edit form ----
+   Printing the edit form directly (inputs, checkboxes, buttons) ran to
+   several pages per room. This instead reads out the settled facts about
+   each room in plain prose/tables, plus a drying curve built from the
+   readings, so the whole job fits in far fewer printed pages. */
+function scopeChecklistSummary(obj, keyLabelPairs, otherText){
+  const picked = keyLabelPairs.filter(([k])=>obj[k]).map(([,label])=>label);
+  if(otherText) picked.push(`Other: ${otherText}`);
+  return picked.length ? picked.join(', ') : '—';
+}
+// Best-effort numeric extraction from a free-typed moisture reading like
+// "18%", "32 WME", or just "22" — anything without a usable number is still
+// shown in the log table, just left out of the graph.
+function parseMoistureValue(raw){
+  const m = String(raw||'').match(/-?\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+}
+// A small dependency-free line chart (inline SVG) plotting each reading
+// against days elapsed since the first reading in that room — the drying
+// curve Clint asked for. Returns '' when there isn't enough numeric data
+// to plot (fewer than two readable readings).
+function moistureChartSvg(readings){
+  const pts = readings
+    .slice().sort((a,b)=>a.createdAt.localeCompare(b.createdAt))
+    .map(r=>({ t: new Date(r.createdAt).getTime(), v: parseMoistureValue(r.moisture) }))
+    .filter(p=>p.v!==null);
+  if(pts.length < 2) return '';
+  const t0 = pts[0].t;
+  const days = pts.map(p=>(p.t - t0) / 86400000);
+  const vals = pts.map(p=>p.v);
+  const W = 520, H = 170, padL = 34, padR = 14, padT = 12, padB = 26;
+  const maxDay = Math.max(1, ...days);
+  const minV = Math.min(0, ...vals);
+  const maxV = Math.max(...vals) * 1.15 || 1;
+  const xOf = d => padL + (d/maxDay) * (W-padL-padR);
+  const yOf = v => padT + (1 - (v-minV)/(maxV-minV)) * (H-padT-padB);
+  const linePts = days.map((d,i)=>`${xOf(d).toFixed(1)},${yOf(vals[i]).toFixed(1)}`).join(' ');
+  const gridLines = [0,0.5,1].map(f=>{
+    const y = padT + f*(H-padT-padB);
+    const val = (maxV - f*(maxV-minV)).toFixed(0);
+    return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#E4E7EC" stroke-width="1"/><text x="${padL-6}" y="${(y+3).toFixed(1)}" font-size="9" fill="#647184" text-anchor="end">${val}</text>`;
+  }).join('');
+  const dots = days.map((d,i)=>`<circle cx="${xOf(d).toFixed(1)}" cy="${yOf(vals[i]).toFixed(1)}" r="3" fill="#C99A3D"/>`).join('');
+  const xLabels = days.map((d,i)=>{
+    if(pts.length>8 && i%Math.ceil(pts.length/8)!==0 && i!==pts.length-1) return '';
+    return `<text x="${xOf(d).toFixed(1)}" y="${H-8}" font-size="9" fill="#647184" text-anchor="middle">${fmtDateShort(new Date(pts[i].t).toISOString().slice(0,10)).replace(/, \d{4}$/,'')}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto;">
+    ${gridLines}
+    <polyline points="${linePts}" fill="none" stroke="#457B9D" stroke-width="2"/>
+    ${dots}
+    ${xLabels}
+  </svg>`;
+}
+function scopeRoomPrintHtml(room){
+  const dims = [room.lengthFt, room.widthFt, room.heightFt].some(Boolean)
+    ? `${room.lengthFt||'—'} x ${room.widthFt||'—'} x ${room.heightFt||'—'} ft` : '—';
+  const materials = scopeChecklistSummary(room.materials, SCOPE_MATERIAL_KEYS, room.materials.other ? room.materials.otherText : '');
+  const work = scopeChecklistSummary(room.work, SCOPE_WORK_KEYS, '');
+  const linesHtml = room.scopeLines.length
+    ? `<ul style="margin:4px 0 0;padding-left:18px;">${room.scopeLines.map(l=>`<li>${escapeHtml(l.text)}${l.qty?` — ${escapeHtml(l.qty)} ${escapeHtml(l.unit||'')}`:''}</li>`).join('')}</ul>`
+    : '<div style="color:var(--muted);">None logged.</div>';
+  const sortedReadings = room.readings.slice().sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+  const readingsTable = sortedReadings.length
+    ? `<table class="report-table" style="margin-top:6px;"><thead><tr><th>Date</th><th>Moisture</th><th>Note</th><th>Logged by</th></tr></thead><tbody>
+        ${sortedReadings.map(r=>`<tr><td>${fmtDateShort(r.createdAt.slice(0,10))}</td><td>${escapeHtml(r.moisture)}</td><td>${escapeHtml(r.note||'—')}</td><td>${escapeHtml(r.createdBy)}</td></tr>`).join('')}
+      </tbody></table>`
+    : '<div style="color:var(--muted);">No readings logged yet.</div>';
+  const chart = moistureChartSvg(room.readings);
+  return `<div class="scope-print-room">
+    <div style="font-size:15px;font-weight:800;margin-bottom:2px;">${escapeHtml(room.name)||'Untitled room'}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Dimensions: ${dims} &nbsp;·&nbsp; Affected: ${escapeHtml(room.affectedArea||'—')}</div>
+    <div style="font-size:12.5px;margin-bottom:3px;"><b>Affected materials:</b> ${escapeHtml(materials)}</div>
+    <div style="font-size:12.5px;margin-bottom:3px;"><b>Work performed:</b> ${escapeHtml(work)}</div>
+    <div style="font-size:12.5px;margin-bottom:3px;"><b>Equipment:</b> ${escapeHtml(room.equipment||'—')}</div>
+    <div style="font-size:12.5px;margin-bottom:8px;"><b>Photos:</b> ${escapeHtml(room.photosNote||'—')}</div>
+    <div style="font-size:12.5px;font-weight:700;margin-top:6px;">Exact scope / quantities</div>
+    ${linesHtml}
+    <div style="font-size:12.5px;font-weight:700;margin-top:10px;">Drying log</div>
+    ${readingsTable}
+    ${chart ? `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--muted);margin-bottom:2px;">Moisture over time</div>${chart}</div>` : ''}
+  </div>`;
+}
+function buildScopeSheetPrintHtml(s){
+  const techList = (s.technicians||'').split(',').map(x=>x.trim()).filter(Boolean);
+  return `${reportLetterheadHtml('Room Scope Sheet &mdash; Drying Log')}
+    <div style="font-size:13px;margin-bottom:2px;"><b>Job:</b> ${escapeHtml(s.jobName)}</div>
+    <div style="font-size:13px;margin-bottom:2px;"><b>Property address:</b> ${escapeHtml(s.propertyAddress||'—')}</div>
+    <div style="font-size:13px;margin-bottom:2px;"><b>Date:</b> ${fmtDateShort(s.date)}</div>
+    <div style="font-size:13px;margin-bottom:14px;"><b>Technician(s):</b> ${escapeHtml(techList.join(', ')||'—')}</div>
+    ${s.rooms.length ? s.rooms.map(scopeRoomPrintHtml).join('') : '<div class="empty">No rooms recorded.</div>'}`;
+}
+function printScopeSheetReport(){
+  if(!currentScopeSheet) return;
+  document.getElementById('scopeSheetPrintArea').innerHTML = buildScopeSheetPrintHtml(currentScopeSheet);
+  document.body.classList.add('printing-overlay','printing-scope-report');
+  window.print();
+  window.onafterprint = ()=>{ document.body.classList.remove('printing-overlay','printing-scope-report'); };
+  setTimeout(()=>document.body.classList.remove('printing-overlay','printing-scope-report'), 1000);
 }
 
 function renderSetupScreen(failed){
