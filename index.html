@@ -810,7 +810,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-09-28T23-30";
+const BUILD_ID = "2026-09-29T00-05";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -2156,7 +2156,19 @@ function closeScopeSheetDetail(){
 // structural changes (add/delete a room, a reading, a scope line) rather
 // than every keystroke, so that log doesn't get flooded with noise while
 // still keeping a real trail of who added or removed what.
-async function commitScopeSheetChange(room, auditSummary){
+// `forceRender` is for explicit "+ Add ..." / delete actions — a deliberate
+// button tap the user just made, as opposed to a field's onchange firing
+// mid-typing. Those need an immediate refresh (to clear the entry form and
+// show the new row) even if the browser still reports focus sitting in a
+// text field — notably Safari on iPhone/iPad, which often does NOT blur a
+// text input when a button elsewhere is tapped. Without this, tapping
+// "+ Add" while the keyboard was still up on the last field you filled in
+// looked like the reading vanished: it was saved, but the deferred-render
+// guard (added to stop background sync from wiping mid-typed text) never
+// fired because focus never visibly left. Plain field edits (typing a
+// dimension, tabbing between fields) still use the deferred, focus-aware
+// path so that fix isn't undone.
+async function commitScopeSheetChange(room, auditSummary, forceRender){
   if(!currentScopeSheet) return;
   currentScopeSheet.updatedAt = nowIso();
   if(room){
@@ -2171,7 +2183,8 @@ async function commitScopeSheetChange(room, auditSummary){
   } else {
     showToast('Change not saved — check your connection and try again');
   }
-  maybeRenderScopeSheetDetail();
+  if(forceRender){ scopeSheetRenderPending = false; renderScopeSheetDetail(); }
+  else { maybeRenderScopeSheetDetail(); }
   return ok;
 }
 // The whole sheet re-renders from scratch on every change (add a room,
@@ -2239,26 +2252,26 @@ function addScopeDailyLog(){
   const gpp = (tempF && rh) ? computeGPP(parseFloat(tempF), parseFloat(rh)) : null;
   currentScopeSheet.dailyLogs = currentScopeSheet.dailyLogs || [];
   currentScopeSheet.dailyLogs.push({ id: uid('DL'), date, time, tempF, rh, gpp, dehus, airMovers, airScrubbers, technician, notes, createdBy: currentUser.name, createdAt: nowIso() });
-  commitScopeSheetChange(null, `Logged daily atmospheric/equipment reading for ${currentScopeSheet.jobName} (${fmtDateShort(date)})`);
+  commitScopeSheetChange(null, `Logged daily atmospheric/equipment reading for ${currentScopeSheet.jobName} (${fmtDateShort(date)})`, true);
 }
 function deleteScopeDailyLog(logId){
   if(!currentScopeSheet) return;
   if(!confirm('Delete this daily log entry?')) return;
   currentScopeSheet.dailyLogs = (currentScopeSheet.dailyLogs||[]).filter(l=>l.id!==logId);
-  commitScopeSheetChange(null, `Deleted a daily atmospheric/equipment log entry from ${currentScopeSheet.jobName}`);
+  commitScopeSheetChange(null, `Deleted a daily atmospheric/equipment log entry from ${currentScopeSheet.jobName}`, true);
 }
 function addScopeRoom(){
   const room = newScopeRoom();
   currentScopeSheet.rooms.push(room);
   scopeRoomExpanded.add(room.id);
-  commitScopeSheetChange(room, `Added room to ${currentScopeSheet.jobName}`);
+  commitScopeSheetChange(room, `Added room to ${currentScopeSheet.jobName}`, true);
 }
 function deleteScopeRoom(roomId){
   const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
   if(!room) return;
   if(!confirm(`Delete "${room.name||'this room'}"? This removes its scope, readings, and photos note.`)) return;
   currentScopeSheet.rooms = currentScopeSheet.rooms.filter(r=>r.id!==roomId);
-  commitScopeSheetChange(null, `Deleted room "${room.name||'(unnamed)'}" from ${currentScopeSheet.jobName}`);
+  commitScopeSheetChange(null, `Deleted room "${room.name||'(unnamed)'}" from ${currentScopeSheet.jobName}`, true);
 }
 function toggleScopeRoomExpanded(roomId){
   if(scopeRoomExpanded.has(roomId)) scopeRoomExpanded.delete(roomId); else scopeRoomExpanded.add(roomId);
@@ -2290,7 +2303,7 @@ function addScopeLine(roomId){
   const unit = document.getElementById(`scopeLineUnit_${roomId}`).value.trim();
   if(!desc){ showToast('Enter a location/material/action first'); return; }
   room.scopeLines.push({ id: uid('SL'), text: desc, qty, unit, createdBy: currentUser.name, createdAt: nowIso() });
-  commitScopeSheetChange(room, `Added scope line "${desc}" to ${room.name||'a room'} (${currentScopeSheet.jobName})`);
+  commitScopeSheetChange(room, `Added scope line "${desc}" to ${room.name||'a room'} (${currentScopeSheet.jobName})`, true);
 }
 function deleteScopeLine(roomId, lineId){
   const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
@@ -2298,7 +2311,7 @@ function deleteScopeLine(roomId, lineId){
   const line = room.scopeLines.find(l=>l.id===lineId);
   if(!confirm(`Delete "${line ? line.text : 'this line'}"?`)) return;
   room.scopeLines = room.scopeLines.filter(l=>l.id!==lineId);
-  commitScopeSheetChange(room, `Deleted scope line "${line?line.text:''}" from ${room.name||'a room'} (${currentScopeSheet.jobName})`);
+  commitScopeSheetChange(room, `Deleted scope line "${line?line.text:''}" from ${room.name||'a room'} (${currentScopeSheet.jobName})`, true);
 }
 function addScopeReading(roomId){
   const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
@@ -2307,7 +2320,7 @@ function addScopeReading(roomId){
   const note = document.getElementById(`scopeReadingNote_${roomId}`).value.trim();
   if(!moisture){ showToast('Enter a moisture reading first'); return; }
   room.readings.push({ id: uid('RD'), moisture, note, createdBy: currentUser.name, createdAt: nowIso() });
-  commitScopeSheetChange(room, `Logged reading ${moisture} for ${room.name||'a room'} (${currentScopeSheet.jobName})`);
+  commitScopeSheetChange(room, `Logged reading ${moisture} for ${room.name||'a room'} (${currentScopeSheet.jobName})`, true);
 }
 function deleteScopeReading(roomId, readingId){
   const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
@@ -2315,7 +2328,7 @@ function deleteScopeReading(roomId, readingId){
   if(!confirm('Delete this reading?')) return;
   const reading = room.readings.find(r=>r.id===readingId);
   room.readings = room.readings.filter(r=>r.id!==readingId);
-  commitScopeSheetChange(room, `Deleted a reading (${reading?reading.moisture:''}) from ${room.name||'a room'} (${currentScopeSheet.jobName})`);
+  commitScopeSheetChange(room, `Deleted a reading (${reading?reading.moisture:''}) from ${room.name||'a room'} (${currentScopeSheet.jobName})`, true);
 }
 function renderScopeSheetDetail(){
   if(!currentScopeSheet) return;
