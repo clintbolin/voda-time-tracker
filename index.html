@@ -810,7 +810,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-09-28T23";
+const BUILD_ID = "2026-09-28T23-30";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -2037,6 +2037,7 @@ function newScopeRoom(){
     name: '',
     lengthFt:'', widthFt:'', heightFt:'',
     affectedArea:'',
+    dryStandard:'',
     materials, work,
     equipment:'',
     photosNote: `See True Restore for photos and current readings — dated ${fmtDateShort(todayStr())}`,
@@ -2045,6 +2046,20 @@ function newScopeRoom(){
     createdBy: currentUser.name, createdAt: nowIso(),
     lastUpdatedBy: currentUser.name, lastUpdatedAt: nowIso()
   };
+}
+const DEFAULT_SCOPE_FINAL_NOTE = 'Moisture readings taken throughout affected areas. Previously elevated materials have reached established drying goals based on unaffected comparison materials. Equipment removed after final verification. Photos and final moisture readings uploaded to job file.';
+// Grains-per-pound (GPP) from a temp/RH reading — standard psychrometric
+// approximation (Magnus formula for saturation vapor pressure, sea-level
+// standard atmospheric pressure). Matches what a restoration GPP chart/
+// calculator gives closely enough for field monitoring purposes.
+function computeGPP(tempF, rh){
+  if(tempF==null || rh==null || isNaN(tempF) || isNaN(rh)) return null;
+  const tempC = (tempF - 32) * 5/9;
+  const es = 6.1094 * Math.exp(17.625*tempC/(tempC+243.04)); // hPa
+  const e = (rh/100) * es;
+  const P = 1013.25; // hPa, sea-level standard
+  const w = 0.622 * e / (P - e); // kg water / kg dry air
+  return Math.round(w * 7000); // grains per pound
 }
 // Whoever has a job log for this job name today gets suggested as the
 // technician(s) — saves retyping names already captured by the time clock.
@@ -2117,8 +2132,11 @@ function openScopeSheetForJob(jobName){
       jobName,
       propertyAddress:'',
       date: todayStr(),
+      lossDescription:'',
       technicians: techniciansForJobToday(jobName),
       rooms: [],
+      dailyLogs: [],
+      finalNotes: '',
       createdBy: currentUser.name, createdAt: nowIso(), updatedAt: nowIso()
     };
   }
@@ -2202,6 +2220,33 @@ function toggleScopeTechnician(name, checked){
   currentScopeSheet.technicians = list.join(', ');
   commitScopeSheetChange(null);
 }
+// One row per monitoring visit — the job-level atmospheric/equipment log
+// (separate from each room's own moisture readings), matching a standard
+// drying-log form: temp, RH, GPP (auto-calculated when temp+RH are given),
+// and equipment counts on site that day.
+function addScopeDailyLog(){
+  if(!currentScopeSheet) return;
+  const date = document.getElementById('dailyLogDate').value || todayStr();
+  const time = document.getElementById('dailyLogTime').value || '';
+  const tempF = document.getElementById('dailyLogTemp').value.trim();
+  const rh = document.getElementById('dailyLogRH').value.trim();
+  const dehus = document.getElementById('dailyLogDehus').value.trim();
+  const airMovers = document.getElementById('dailyLogAirMovers').value.trim();
+  const airScrubbers = document.getElementById('dailyLogAirScrubbers').value.trim();
+  const technician = document.getElementById('dailyLogTech').value.trim();
+  const notes = document.getElementById('dailyLogNotes').value.trim();
+  if(!tempF && !rh && !notes){ showToast('Enter a temperature/humidity reading or a note first'); return; }
+  const gpp = (tempF && rh) ? computeGPP(parseFloat(tempF), parseFloat(rh)) : null;
+  currentScopeSheet.dailyLogs = currentScopeSheet.dailyLogs || [];
+  currentScopeSheet.dailyLogs.push({ id: uid('DL'), date, time, tempF, rh, gpp, dehus, airMovers, airScrubbers, technician, notes, createdBy: currentUser.name, createdAt: nowIso() });
+  commitScopeSheetChange(null, `Logged daily atmospheric/equipment reading for ${currentScopeSheet.jobName} (${fmtDateShort(date)})`);
+}
+function deleteScopeDailyLog(logId){
+  if(!currentScopeSheet) return;
+  if(!confirm('Delete this daily log entry?')) return;
+  currentScopeSheet.dailyLogs = (currentScopeSheet.dailyLogs||[]).filter(l=>l.id!==logId);
+  commitScopeSheetChange(null, `Deleted a daily atmospheric/equipment log entry from ${currentScopeSheet.jobName}`);
+}
 function addScopeRoom(){
   const room = newScopeRoom();
   currentScopeSheet.rooms.push(room);
@@ -2282,15 +2327,50 @@ function renderScopeSheetDetail(){
   const techNames = [...new Set([...employees.filter(e=>!e.archived).map(e=>e.name), ...techList])].sort((a,b)=>a.localeCompare(b));
   const techHtml = techNames.map(name=>`
     <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;padding:3px 0;"><input type="checkbox" ${techList.includes(name)?'checked':''} onchange="toggleScopeTechnician('${name.replace(/'/g,"\\'")}',this.checked)"> ${escapeHtml(name)}</label>`).join('');
+  const dailyLogs = (s.dailyLogs||[]).slice().sort((a,b)=>(b.date+ (b.time||'')).localeCompare(a.date+(a.time||'')));
+  const dailyLogRows = dailyLogs.map(l=>`
+    <div class="list-row">
+      <div>
+        <div class="nm">${fmtDateShort(l.date)}${l.time?` ${escapeHtml(l.time)}`:''} — ${l.tempF?escapeHtml(l.tempF)+'°F':'—'} / ${l.rh?escapeHtml(l.rh)+'%RH':'—'}${l.gpp!=null?` / ${l.gpp} GPP`:''}</div>
+        <div style="font-size:11px;color:var(--muted);">Dehus ${escapeHtml(l.dehus||'0')} · Air movers ${escapeHtml(l.airMovers||'0')} · Scrubbers ${escapeHtml(l.airScrubbers||'0')}${l.technician?` · ${escapeHtml(l.technician)}`:''}${l.notes?` — ${escapeHtml(l.notes)}`:''}</div>
+      </div>
+      <button class="del-btn" onclick="deleteScopeDailyLog('${l.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+    </div>`).join('') || `<div class="empty">No daily readings logged yet.</div>`;
   document.getElementById('scopeSheetDetailBody').innerHTML = `
     ${reportLetterheadHtml('Room Scope Sheet')}
     <div class="field"><label>Property address</label><input value="${escapeHtml(s.propertyAddress)}" placeholder="Address" onchange="updateScopeSheetField('propertyAddress', this.value)"></div>
     <div class="field"><label>Date</label><input type="date" value="${s.date}" onchange="updateScopeSheetField('date', this.value)"></div>
+    <div class="field"><label>Loss details</label><input value="${escapeHtml(s.lossDescription||'')}" placeholder="e.g. Category 2 water loss from supply line failure" onchange="updateScopeSheetField('lossDescription', this.value)"></div>
     <div class="card-eyebrow" style="margin-top:10px;">Technician(s)</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;">${techHtml || '<div class="empty">No employees on file yet.</div>'}</div>
     <div class="card-eyebrow" style="margin-top:10px;">Rooms</div>
     ${roomsHtml}
     <button class="btn btn-gold" style="margin-top:6px;" onclick="addScopeRoom()">+ Add Room</button>
+
+    <div class="card-eyebrow" style="margin-top:16px;">Daily atmospheric &amp; equipment log</div>
+    ${dailyLogRows}
+    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+      <div class="field" style="flex:1;min-width:120px;margin-bottom:6px;"><label>Date</label><input type="date" id="dailyLogDate" value="${todayStr()}"></div>
+      <div class="field" style="flex:1;min-width:90px;margin-bottom:6px;"><label>Time</label><input type="time" id="dailyLogTime"></div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <input id="dailyLogTemp" type="number" style="flex:1;min-width:70px;" placeholder="Temp °F">
+      <input id="dailyLogRH" type="number" style="flex:1;min-width:70px;" placeholder="RH %">
+      <input id="dailyLogDehus" type="number" style="flex:1;min-width:70px;" placeholder="Dehus">
+      <input id="dailyLogAirMovers" type="number" style="flex:1;min-width:70px;" placeholder="Air movers">
+      <input id="dailyLogAirScrubbers" type="number" style="flex:1;min-width:70px;" placeholder="Scrubbers">
+    </div>
+    <div style="display:flex;gap:6px;margin-top:6px;">
+      <input id="dailyLogTech" list="scopeDailyLogTechList" style="flex:1;" placeholder="Technician">
+      <input id="dailyLogNotes" style="flex:2;" placeholder="Notes (optional)">
+    </div>
+    <datalist id="scopeDailyLogTechList">${techNames.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
+    <button class="btn btn-ghost" style="margin-top:6px;" onclick="addScopeDailyLog()">+ Add daily reading</button>
+
+    <div class="field" style="margin-top:16px;"><label>Final notes / verification</label>
+      <textarea onchange="updateScopeSheetField('finalNotes', this.value)" rows="3" placeholder="${DEFAULT_SCOPE_FINAL_NOTE}">${escapeHtml(s.finalNotes||'')}</textarea>
+    </div>
+
     <div class="btn-row" style="margin-top:16px;">
       <button class="btn btn-ghost" onclick="printScopeSheetReport()">Print</button>
       <button class="btn btn-black" onclick="closeScopeSheetDetail()">Done</button>
@@ -2339,6 +2419,7 @@ function renderScopeRoomCard(room){
       <div class="field" style="flex:1;margin-bottom:8px;"><label>H (ft)</label><input type="number" value="${room.heightFt}" onchange="updateScopeRoomField('${room.id}','heightFt',this.value)"></div>
     </div>
     <div class="field"><label>Affected SF / LF</label><input value="${escapeHtml(room.affectedArea)}" placeholder="e.g. 120 SF" onchange="updateScopeRoomField('${room.id}','affectedArea',this.value)"></div>
+    <div class="field"><label>Dry standard / reference reading</label><input value="${escapeHtml(room.dryStandard||'')}" placeholder="e.g. 12%" onchange="updateScopeRoomField('${room.id}','dryStandard',this.value)"></div>
     <div class="card-eyebrow" style="margin-top:10px;">Affected materials</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;">${materialsHtml}</div>
     ${otherHtml}
@@ -2382,42 +2463,87 @@ function parseMoistureValue(raw){
   const m = String(raw||'').match(/-?\d+(\.\d+)?/);
   return m ? parseFloat(m[0]) : null;
 }
-// A small dependency-free line chart (inline SVG) plotting each reading
-// against days elapsed since the first reading in that room — the drying
-// curve Clint asked for. Returns '' when there isn't enough numeric data
-// to plot (fewer than two readable readings).
-function moistureChartSvg(readings){
-  const pts = readings
-    .slice().sort((a,b)=>a.createdAt.localeCompare(b.createdAt))
-    .map(r=>({ t: new Date(r.createdAt).getTime(), v: parseMoistureValue(r.moisture) }))
-    .filter(p=>p.v!==null);
-  if(pts.length < 2) return '';
-  const t0 = pts[0].t;
-  const days = pts.map(p=>(p.t - t0) / 86400000);
-  const vals = pts.map(p=>p.v);
-  const W = 520, H = 170, padL = 34, padR = 14, padT = 12, padB = 26;
-  const maxDay = Math.max(1, ...days);
-  const minV = Math.min(0, ...vals);
-  const maxV = Math.max(...vals) * 1.15 || 1;
+// A combined drying-progress chart (inline SVG, no library) — one colored
+// line per monitored room/material, all plotted against days elapsed since
+// the earliest numeric reading on the job, with a legend underneath. This
+// is the visual companion to the Moisture Readings table below it, not a
+// replacement for it — same numbers, shown as a trend. Rooms with fewer
+// than two readable numeric readings are simply left off the chart (their
+// numbers still show in the table).
+function dryingProgressChartSvg(rooms){
+  const series = rooms.map(room=>{
+    const pts = room.readings.slice().sort((a,b)=>a.createdAt.localeCompare(b.createdAt))
+      .map(r=>({ t: new Date(r.createdAt).getTime(), v: parseMoistureValue(r.moisture) }))
+      .filter(p=>p.v!==null);
+    return { room, pts };
+  }).filter(s=>s.pts.length>=2);
+  if(!series.length) return '';
+  const t0 = Math.min(...series.flatMap(s=>s.pts.map(p=>p.t)));
+  const allVals = series.flatMap(s=>s.pts.map(p=>p.v));
+  const allDays = series.flatMap(s=>s.pts.map(p=>(p.t-t0)/86400000));
+  const W=620, H=250, padL=38, padR=16, padT=14, padB=50;
+  const maxDay = Math.max(1, ...allDays);
+  const minV = Math.min(0, ...allVals);
+  const maxV = Math.max(...allVals) * 1.15 || 1;
   const xOf = d => padL + (d/maxDay) * (W-padL-padR);
   const yOf = v => padT + (1 - (v-minV)/(maxV-minV)) * (H-padT-padB);
-  const linePts = days.map((d,i)=>`${xOf(d).toFixed(1)},${yOf(vals[i]).toFixed(1)}`).join(' ');
-  const gridLines = [0,0.5,1].map(f=>{
+  const gridLines = [0,0.25,0.5,0.75,1].map(f=>{
     const y = padT + f*(H-padT-padB);
     const val = (maxV - f*(maxV-minV)).toFixed(0);
-    return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#E4E7EC" stroke-width="1"/><text x="${padL-6}" y="${(y+3).toFixed(1)}" font-size="9" fill="#647184" text-anchor="end">${val}</text>`;
+    return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#E4E7EC" stroke-width="1"/><text x="${padL-6}" y="${(y+3).toFixed(1)}" font-size="9" fill="#647184" text-anchor="end">${val}%</text>`;
   }).join('');
-  const dots = days.map((d,i)=>`<circle cx="${xOf(d).toFixed(1)}" cy="${yOf(vals[i]).toFixed(1)}" r="3" fill="#C99A3D"/>`).join('');
-  const xLabels = days.map((d,i)=>{
-    if(pts.length>8 && i%Math.ceil(pts.length/8)!==0 && i!==pts.length-1) return '';
-    return `<text x="${xOf(d).toFixed(1)}" y="${H-8}" font-size="9" fill="#647184" text-anchor="middle">${fmtDateShort(new Date(pts[i].t).toISOString().slice(0,10)).replace(/, \d{4}$/,'')}</text>`;
+  const seriesSvg = series.map((s,i)=>{
+    const color = SCOPE_COLOR_PALETTE[i % SCOPE_COLOR_PALETTE.length];
+    const linePts = s.pts.map(p=>`${xOf((p.t-t0)/86400000).toFixed(1)},${yOf(p.v).toFixed(1)}`).join(' ');
+    const dots = s.pts.map(p=>`<circle cx="${xOf((p.t-t0)/86400000).toFixed(1)}" cy="${yOf(p.v).toFixed(1)}" r="3" fill="${color}"/>`).join('');
+    return `<polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="2"/>${dots}`;
   }).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto;">
-    ${gridLines}
-    <polyline points="${linePts}" fill="none" stroke="#457B9D" stroke-width="2"/>
-    ${dots}
-    ${xLabels}
-  </svg>`;
+  const uniqDays = [...new Set(series.flatMap(s=>s.pts.map(p=>Math.round((p.t-t0)/86400000))))].sort((a,b)=>a-b);
+  const xLabels = uniqDays.map((d,i)=>{
+    if(uniqDays.length>8 && i%Math.ceil(uniqDays.length/8)!==0 && i!==uniqDays.length-1) return '';
+    const dt = new Date(t0 + d*86400000);
+    return `<text x="${xOf(d).toFixed(1)}" y="${H-padB+16}" font-size="9" fill="#647184" text-anchor="middle">${fmtDateShort(dt.toISOString().slice(0,10)).replace(/, \d{4}$/,'')}</text>`;
+  }).join('');
+  const legend = series.map((s,i)=>{
+    const color = SCOPE_COLOR_PALETTE[i % SCOPE_COLOR_PALETTE.length];
+    return `<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;font-size:11px;"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;"></span>${escapeHtml(s.room.name||'Untitled room')}</span>`;
+  }).join('');
+  return `<div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto;">${gridLines}${seriesSvg}${xLabels}</svg>
+    <div style="margin-top:6px;">${legend}</div>
+  </div>`;
+}
+// The consolidated Moisture Readings table — one row per room/material,
+// one column per date any room was checked, with a ✓ once a reading is at
+// or under that room's own dry standard. This is the primary numbers table
+// the drying-progress chart illustrates.
+function scopeMoistureTableHtml(rooms){
+  const dateSet = new Set();
+  rooms.forEach(r=>(r.readings||[]).forEach(rd=>dateSet.add(rd.createdAt.slice(0,10))));
+  const dates = [...dateSet].sort();
+  if(!dates.length) return '<div class="empty">No moisture readings logged yet.</div>';
+  const header = `<tr><th>Location / Material</th><th>Dry Standard</th>${dates.map(d=>`<th>${fmtDateShort(d)}</th>`).join('')}</tr>`;
+  const rows = rooms.map(room=>{
+    const byDate = {};
+    room.readings.slice().sort((a,b)=>a.createdAt.localeCompare(b.createdAt)).forEach(rd=>{ byDate[rd.createdAt.slice(0,10)] = rd; });
+    const std = parseFloat(room.dryStandard);
+    const cells = dates.map(d=>{
+      const rd = byDate[d];
+      if(!rd) return '<td>—</td>';
+      const val = parseMoistureValue(rd.moisture);
+      const reached = (val!==null && !isNaN(std) && val<=std);
+      return `<td>${escapeHtml(rd.moisture)}${reached?' ✓':''}</td>`;
+    }).join('');
+    return `<tr><td>${escapeHtml(room.name)||'Untitled room'}</td><td>${escapeHtml(room.dryStandard||'—')}</td>${cells}</tr>`;
+  });
+  return `<table class="report-table"><thead>${header}</thead><tbody>${rows.join('')}</tbody></table>`;
+}
+function scopeDailyLogTableHtml(logs){
+  if(!logs || !logs.length) return '<div class="empty">No daily atmospheric/equipment log entries yet.</div>';
+  const sorted = logs.slice().sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
+  return `<table class="report-table"><thead><tr><th>Date</th><th>Time</th><th>Temp</th><th>RH</th><th>GPP</th><th>Dehus</th><th>Air Movers</th><th>Scrubbers</th><th>Technician</th><th>Notes</th></tr></thead><tbody>
+    ${sorted.map(l=>`<tr><td>${fmtDateShort(l.date)}</td><td>${escapeHtml(l.time||'—')}</td><td>${l.tempF?escapeHtml(l.tempF)+'°F':'—'}</td><td>${l.rh?escapeHtml(l.rh)+'%':'—'}</td><td>${l.gpp!=null?l.gpp:'—'}</td><td>${escapeHtml(l.dehus||'0')}</td><td>${escapeHtml(l.airMovers||'0')}</td><td>${escapeHtml(l.airScrubbers||'0')}</td><td>${escapeHtml(l.technician||'—')}</td><td>${escapeHtml(l.notes||'')}</td></tr>`).join('')}
+  </tbody></table>`;
 }
 function scopeRoomPrintHtml(room){
   const dims = [room.lengthFt, room.widthFt, room.heightFt].some(Boolean)
@@ -2427,35 +2553,46 @@ function scopeRoomPrintHtml(room){
   const linesHtml = room.scopeLines.length
     ? `<ul style="margin:4px 0 0;padding-left:18px;">${room.scopeLines.map(l=>`<li>${escapeHtml(l.text)}${l.qty?` — ${escapeHtml(l.qty)} ${escapeHtml(l.unit||'')}`:''}</li>`).join('')}</ul>`
     : '<div style="color:var(--muted);">None logged.</div>';
-  const sortedReadings = room.readings.slice().sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
-  const readingsTable = sortedReadings.length
-    ? `<table class="report-table" style="margin-top:6px;"><thead><tr><th>Date</th><th>Moisture</th><th>Note</th><th>Logged by</th></tr></thead><tbody>
-        ${sortedReadings.map(r=>`<tr><td>${fmtDateShort(r.createdAt.slice(0,10))}</td><td>${escapeHtml(r.moisture)}</td><td>${escapeHtml(r.note||'—')}</td><td>${escapeHtml(r.createdBy)}</td></tr>`).join('')}
-      </tbody></table>`
-    : '<div style="color:var(--muted);">No readings logged yet.</div>';
-  const chart = moistureChartSvg(room.readings);
   return `<div class="scope-print-room">
     <div style="font-size:15px;font-weight:800;margin-bottom:2px;">${escapeHtml(room.name)||'Untitled room'}</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Dimensions: ${dims} &nbsp;·&nbsp; Affected: ${escapeHtml(room.affectedArea||'—')}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Dimensions: ${dims} &nbsp;·&nbsp; Affected: ${escapeHtml(room.affectedArea||'—')} &nbsp;·&nbsp; Dry standard: ${escapeHtml(room.dryStandard||'—')}</div>
     <div style="font-size:12.5px;margin-bottom:3px;"><b>Affected materials:</b> ${escapeHtml(materials)}</div>
     <div style="font-size:12.5px;margin-bottom:3px;"><b>Work performed:</b> ${escapeHtml(work)}</div>
     <div style="font-size:12.5px;margin-bottom:3px;"><b>Equipment:</b> ${escapeHtml(room.equipment||'—')}</div>
     <div style="font-size:12.5px;margin-bottom:8px;"><b>Photos:</b> ${escapeHtml(room.photosNote||'—')}</div>
     <div style="font-size:12.5px;font-weight:700;margin-top:6px;">Exact scope / quantities</div>
     ${linesHtml}
-    <div style="font-size:12.5px;font-weight:700;margin-top:10px;">Drying log</div>
-    ${readingsTable}
-    ${chart ? `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--muted);margin-bottom:2px;">Moisture over time</div>${chart}</div>` : ''}
   </div>`;
 }
 function buildScopeSheetPrintHtml(s){
   const techList = (s.technicians||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const rooms = s.rooms||[];
+  const chart = dryingProgressChartSvg(rooms);
   return `${reportLetterheadHtml('Room Scope Sheet &mdash; Drying Log')}
     <div style="font-size:13px;margin-bottom:2px;"><b>Job:</b> ${escapeHtml(s.jobName)}</div>
     <div style="font-size:13px;margin-bottom:2px;"><b>Property address:</b> ${escapeHtml(s.propertyAddress||'—')}</div>
     <div style="font-size:13px;margin-bottom:2px;"><b>Date:</b> ${fmtDateShort(s.date)}</div>
+    <div style="font-size:13px;margin-bottom:2px;"><b>Loss details:</b> ${escapeHtml(s.lossDescription||'—')}</div>
     <div style="font-size:13px;margin-bottom:14px;"><b>Technician(s):</b> ${escapeHtml(techList.join(', ')||'—')}</div>
-    ${s.rooms.length ? s.rooms.map(scopeRoomPrintHtml).join('') : '<div class="empty">No rooms recorded.</div>'}`;
+
+    <div class="card-eyebrow" style="margin-top:6px;">Moisture readings</div>
+    ${scopeMoistureTableHtml(rooms)}
+
+    ${chart ? `<div class="card-eyebrow" style="margin-top:14px;">Drying progress</div><div style="margin-top:4px;">${chart}</div>` : ''}
+
+    <div class="card-eyebrow" style="margin-top:14px;">Daily atmospheric &amp; equipment log</div>
+    ${scopeDailyLogTableHtml(s.dailyLogs)}
+
+    <div class="card-eyebrow" style="margin-top:14px;">Room detail</div>
+    ${rooms.length ? rooms.map(scopeRoomPrintHtml).join('') : '<div class="empty">No rooms recorded.</div>'}
+
+    <div class="card-eyebrow" style="margin-top:14px;">Final notes</div>
+    <div style="font-size:12.5px;white-space:pre-wrap;">${escapeHtml(s.finalNotes || DEFAULT_SCOPE_FINAL_NOTE)}</div>
+
+    <div style="display:flex;gap:40px;margin-top:34px;">
+      <div style="flex:1;border-top:1px solid #10202E;padding-top:4px;font-size:11px;color:var(--muted);">Technician signature / initials</div>
+      <div style="flex:1;border-top:1px solid #10202E;padding-top:4px;font-size:11px;color:var(--muted);">Date</div>
+    </div>`;
 }
 function printScopeSheetReport(){
   if(!currentScopeSheet) return;
