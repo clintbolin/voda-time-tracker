@@ -122,6 +122,24 @@ main.content{padding:16px 14px 4px;}
   font-family:inherit;background:#fbfcfd;color:var(--ink);outline:none;
 }
 .field input:focus,.field select:focus{border-color:var(--gold);}
+/* Daily Atmospheric & Equipment Log — larger than the standard .field, since
+   these get filled in on a phone outdoors, often in a hurry. */
+.dlog-field{margin-bottom:12px;}
+.dlog-field label{display:block;font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:6px;}
+.dlog-field input,.dlog-field select{
+  width:100%;border:1.5px solid var(--line);border-radius:10px;padding:14px;font-size:17px;
+  font-family:inherit;background:#fbfcfd;color:var(--ink);outline:none;box-sizing:border-box;
+}
+.dlog-field input:focus,.dlog-field select:focus{border-color:var(--gold);}
+/* One-tap chip selectors (Water Category, Drying Class, Yes/No, Contents
+   status) — a button row instead of a dropdown or free-typed field, so a
+   tech on a ladder can pick one with a single tap. */
+.scope-chip-row{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px;}
+.scope-chip{
+  border:1.5px solid var(--line);border-radius:99px;padding:8px 14px;font-size:13.5px;font-weight:700;
+  background:#fbfcfd;color:var(--ink);cursor:pointer;font-family:inherit;
+}
+.scope-chip.sel{background:var(--gold);border-color:var(--gold);color:var(--black);}
 
 .check-row{
   display:flex;align-items:flex-start;gap:11px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer;
@@ -810,7 +828,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-09-29T00-05";
+const BUILD_ID = "2026-09-30T22-10";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -1065,18 +1083,33 @@ async function refreshDataFromServer(){
     if(data.scopeSheets) scopeSheets = data.scopeSheets;
     // Re-find todayEntry by id in the fresh data rather than trusting the
     // old object reference, so in-progress local state stays pointed at
-    // the right (now updated) record instead of a stale clone.
+    // the right (now updated) record instead of a stale clone. But only
+    // adopt it if it's actually newer than what's already showing locally
+    // — a Google Sheets read can occasionally lag a moment behind a write
+    // that just happened on this same device (e.g. tapping "Back to shop"
+    // right after "End Lunch"), and blindly overwriting with that stale
+    // read would silently UNDO the action that was just taken (this is
+    // what caused "Back to shop" to flip back to showing "On lunch" —
+    // the background sync reverted todayEntry to the pre-End-Lunch state
+    // it had just fetched before that save had fully landed).
     if(todayEntry){
       const fresh = entries.find(e=>e.id===todayEntry.id);
-      if(fresh) todayEntry = fresh;
+      if(fresh && (!todayEntry.updatedAt || !fresh.updatedAt || fresh.updatedAt >= todayEntry.updatedAt)){
+        todayEntry = fresh;
+      }
     }
     // A scope sheet can have more than one tech adding rooms/readings to it
     // at once — if the one currently open is still around in the fresh
     // data, keep viewing that same object (not a stale clone) so someone
-    // else's update appears without needing to close and reopen it.
+    // else's update appears without needing to close and reopen it. Same
+    // staleness guard as todayEntry above, so a lagging read can't revert
+    // a change just made on this device.
     if(currentScopeSheet){
       const freshSheet = scopeSheets.find(s=>s.id===currentScopeSheet.id);
-      if(freshSheet){ currentScopeSheet = freshSheet; maybeRenderScopeSheetDetail(); }
+      if(freshSheet && (!currentScopeSheet.updatedAt || !freshSheet.updatedAt || freshSheet.updatedAt >= currentScopeSheet.updatedAt)){
+        currentScopeSheet = freshSheet;
+        maybeRenderScopeSheetDetail();
+      }
     }
   }catch(e){
     console.warn('Background refresh failed — will retry on the next tick', e);
@@ -2028,18 +2061,34 @@ function attributionBadge(name, iso){
   return `<span style="background:${employeeColor(name)};color:#fff;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;white-space:nowrap;">${escapeHtml(name)} — ${fmtDateShort(iso.slice(0,10))}</span>`;
 }
 const SCOPE_MATERIAL_KEYS = [['drywall','Drywall'],['ceiling','Ceiling'],['insulation','Insulation'],['flooring','Flooring'],['baseboard','Baseboard'],['cabinets','Cabinets'],['framing','Framing'],['contents','Contents'],['trimDoor','Trim / door'],['tile','Tile']];
-const SCOPE_WORK_KEYS = [['protect','Protect'],['extract','Extract'],['contain','Contain'],['detach','Detach'],['remove','Remove'],['dryInPlace','Dry in place'],['hepaVac','HEPA vac'],['cleanWipe','Clean / wipe'],['antimicrobial','Antimicrobial'],['sandSeal','Sand / seal'],['monitor','Monitor']];
-function newScopeRoom(){
+const SCOPE_WORK_KEYS = [['protect','Protect'],['extract','Extract'],['contain','Contain'],['detach','Detach'],['remove','Remove'],['dryInPlace','Dry in place'],['hepaVac','HEPA vac'],['cleanWipe','Clean / wipe'],['antimicrobial','Antimicrobial'],['sandSeal','Sand / seal'],['monitor','Monitor'],['negativeAir','Negative air'],['airFiltration','Air filtration'],['ppeRequired','PPE required'],['regulatedMaterialTesting','Regulated-material testing/clearance required'],['specialtyTrade','Specialty trade needed (plumber/electrician)']];
+// The fixed action list from Voda's insurance-ready paper scope sheet —
+// gives each exact-scope line a defined verb an adjuster can act on,
+// instead of whatever wording happened to get typed into the description.
+const SCOPE_LINE_ACTIONS = ['Protect','Extract','Detach/Reset','Remove','Dry in place','HEPA vacuum','Clean/wipe','Sand','Seal','Monitor','Other'];
+const SCOPE_WATER_CATEGORIES = ['1','2','3','N/A'];
+const SCOPE_DRYING_CLASSES = ['1','2','3','4','N/A'];
+const SCOPE_CONTENTS_STATUSES = [['unaffected','Unaffected'],['manipulation','Manipulation'],['packout','Pack-out'],['nonsalvageable','Non-salvageable']];
+function newScopeRoom(roomNumber){
   const materials = { otherText:'' }; SCOPE_MATERIAL_KEYS.forEach(([k])=>materials[k]=false); materials.other=false;
   const work = {}; SCOPE_WORK_KEYS.forEach(([k])=>work[k]=false);
   return {
     id: uid('RM'),
+    roomNumber: roomNumber || 1, // a stable "Room 1 / Room 2" label for cross-referencing on the printed report — assigned once at creation, never renumbered even if an earlier room is later deleted
     name: '',
+    floor: '',
+    causeSource: '',
+    sourceCorrected: '', // '', 'yes', 'no'
+    waterCategory: '',
+    dryingClass: '',
+    preExisting: '', // '', 'yes', 'no'
     lengthFt:'', widthFt:'', heightFt:'',
     affectedArea:'',
     dryStandard:'',
     materials, work,
     equipment:'',
+    contentsStatus: '',
+    exceptionsNotes: '',
     photosNote: `See True Restore for photos and current readings — dated ${fmtDateShort(todayStr())}`,
     scopeLines: [],
     readings: [],
@@ -2091,6 +2140,44 @@ async function saveScopeSheetsMerged(sheetsToUpsert){
 }
 let currentScopeSheet = null;
 let scopeRoomExpanded = new Set();
+// The "+ Add daily reading" form is a multi-field draft that only becomes
+// real data once "Add" is tapped — unlike every other field in this sheet,
+// which commits (and saves) the moment it changes. That made it uniquely
+// fragile: any re-render (a background sync, another field's save landing,
+// even someone else editing the sheet on another device) would regenerate
+// these inputs from scratch and wipe out whatever had been typed but not
+// yet submitted, which is what was making entries vanish or "not save."
+// Keeping the in-progress values here instead, and having every keystroke
+// update this object immediately (see updateScopeDailyLogDraft), means a
+// re-render always rebuilds the form FROM this draft rather than from
+// nothing — so a stray re-render can no longer lose what's been typed.
+let scopeDailyLogDraft = {};
+function resetScopeDailyLogDraft(){
+  scopeDailyLogDraft = { date: todayStr(), time:'', tempF:'', rh:'', dehus:'', airMovers:'', airScrubbers:'', technician:'', notes:'', roomMoisture:{} };
+}
+resetScopeDailyLogDraft();
+function updateScopeDailyLogDraft(field, value){
+  scopeDailyLogDraft[field] = value;
+}
+function updateScopeDailyLogRoomMoisture(roomId, value){
+  scopeDailyLogDraft.roomMoisture = scopeDailyLogDraft.roomMoisture || {};
+  scopeDailyLogDraft.roomMoisture[roomId] = value;
+}
+// The "+ Add line" row under Exact Scope / Quantities is the same kind of
+// scratch, multi-field, Add-button-submitted form as the daily log above —
+// and was built the same vulnerable way at first (plain DOM inputs read by
+// id only when the button was tapped). Same fix: one draft object per room,
+// updated on every keystroke, with the inputs always rendered FROM the
+// draft — so a background sync or another field's save landing mid-entry
+// can no longer wipe a half-typed scope line.
+let scopeLineDraft = {};
+function getScopeLineDraft(roomId){
+  if(!scopeLineDraft[roomId]) scopeLineDraft[roomId] = { desc:'', qty:'', unit:'', action:'', photoRef:'' };
+  return scopeLineDraft[roomId];
+}
+function updateScopeLineDraft(roomId, field, value){
+  getScopeLineDraft(roomId)[field] = value;
+}
 function openScopeSheetsHub(){
   document.getElementById('scopeSheetJobList').innerHTML = allJobNames().map(n=>`<option value="${escapeHtml(n)}">`).join('');
   document.getElementById('scopeSheetJobSearch').value = '';
@@ -2142,6 +2229,7 @@ function openScopeSheetForJob(jobName){
   }
   currentScopeSheet = sheet;
   scopeRoomExpanded = new Set();
+  resetScopeDailyLogDraft();
   closeModal('modalScopeSheetsHub');
   renderScopeSheetDetail();
   openModal('modalScopeSheetDetail');
@@ -2237,31 +2325,64 @@ function toggleScopeTechnician(name, checked){
 // (separate from each room's own moisture readings), matching a standard
 // drying-log form: temp, RH, GPP (auto-calculated when temp+RH are given),
 // and equipment counts on site that day.
+// The daily visit is now the ONE place moisture gets logged (per Clint's
+// request to stop entering drying-log data in two places) — this submits
+// the atmospheric/equipment numbers AND, in the same action, a moisture
+// reading for every room that has a value filled in. Each room's reading
+// is still appended to that room's own `readings` array (tagged with this
+// visit's id) so the existing Moisture Readings table and drying-progress
+// graph on the printed report keep working unchanged — they just now get
+// fed from one combined entry instead of a separate per-room add.
 function addScopeDailyLog(){
   if(!currentScopeSheet) return;
-  const date = document.getElementById('dailyLogDate').value || todayStr();
-  const time = document.getElementById('dailyLogTime').value || '';
-  const tempF = document.getElementById('dailyLogTemp').value.trim();
-  const rh = document.getElementById('dailyLogRH').value.trim();
-  const dehus = document.getElementById('dailyLogDehus').value.trim();
-  const airMovers = document.getElementById('dailyLogAirMovers').value.trim();
-  const airScrubbers = document.getElementById('dailyLogAirScrubbers').value.trim();
-  const technician = document.getElementById('dailyLogTech').value.trim();
-  const notes = document.getElementById('dailyLogNotes').value.trim();
-  if(!tempF && !rh && !notes){ showToast('Enter a temperature/humidity reading or a note first'); return; }
+  const d = scopeDailyLogDraft;
+  const date = d.date || todayStr();
+  const time = d.time || '';
+  const tempF = (d.tempF||'').trim();
+  const rh = (d.rh||'').trim();
+  const dehus = (d.dehus||'').trim();
+  const airMovers = (d.airMovers||'').trim();
+  const airScrubbers = (d.airScrubbers||'').trim();
+  const technician = (d.technician||'').trim();
+  const notes = (d.notes||'').trim();
+  const roomMoisture = d.roomMoisture || {};
+  const roomsWithReadings = currentScopeSheet.rooms.filter(r=>(roomMoisture[r.id]||'').toString().trim());
+  if(!tempF && !rh && !notes && roomsWithReadings.length===0){
+    showToast('Enter a temperature/humidity reading, a moisture reading, or a note first');
+    return;
+  }
   const gpp = (tempF && rh) ? computeGPP(parseFloat(tempF), parseFloat(rh)) : null;
+  const visitId = uid('VISIT');
+  // Always honor the chosen date (defaulting the time of day to noon when
+  // none is given) rather than falling back to "right now" — a backfilled
+  // visit for an earlier date must file under that date in the Moisture
+  // Readings table, not under today's.
+  const createdAt = date ? new Date(`${date}T${time || '12:00'}:00`).toISOString() : nowIso();
+  const roomReadingsSnapshot = [];
+  roomsWithReadings.forEach(room=>{
+    const moisture = roomMoisture[room.id].toString().trim();
+    room.readings.push({ id: uid('RD'), moisture, note:'', visitId, createdBy: currentUser.name, createdAt });
+    room.lastUpdatedBy = currentUser.name;
+    room.lastUpdatedAt = nowIso();
+    roomReadingsSnapshot.push({ roomId: room.id, roomName: room.name || 'Untitled room', moisture });
+  });
   currentScopeSheet.dailyLogs = currentScopeSheet.dailyLogs || [];
-  currentScopeSheet.dailyLogs.push({ id: uid('DL'), date, time, tempF, rh, gpp, dehus, airMovers, airScrubbers, technician, notes, createdBy: currentUser.name, createdAt: nowIso() });
-  commitScopeSheetChange(null, `Logged daily atmospheric/equipment reading for ${currentScopeSheet.jobName} (${fmtDateShort(date)})`, true);
+  currentScopeSheet.dailyLogs.push({ id: visitId, date, time, tempF, rh, gpp, dehus, airMovers, airScrubbers, technician, notes, roomReadings: roomReadingsSnapshot, createdBy: currentUser.name, createdAt: nowIso() });
+  resetScopeDailyLogDraft();
+  commitScopeSheetChange(null, `Logged daily reading for ${currentScopeSheet.jobName} (${fmtDateShort(date)})`, true);
 }
 function deleteScopeDailyLog(logId){
   if(!currentScopeSheet) return;
-  if(!confirm('Delete this daily log entry?')) return;
+  if(!confirm('Delete this daily log entry? This also removes any room moisture readings logged with it.')) return;
+  currentScopeSheet.rooms.forEach(room=>{
+    room.readings = (room.readings||[]).filter(r=>r.visitId!==logId);
+  });
   currentScopeSheet.dailyLogs = (currentScopeSheet.dailyLogs||[]).filter(l=>l.id!==logId);
-  commitScopeSheetChange(null, `Deleted a daily atmospheric/equipment log entry from ${currentScopeSheet.jobName}`, true);
+  commitScopeSheetChange(null, `Deleted a daily log entry from ${currentScopeSheet.jobName}`, true);
 }
 function addScopeRoom(){
-  const room = newScopeRoom();
+  const nextNumber = currentScopeSheet.rooms.reduce((max,r)=>Math.max(max, r.roomNumber||0), 0) + 1;
+  const room = newScopeRoom(nextNumber);
   currentScopeSheet.rooms.push(room);
   scopeRoomExpanded.add(room.id);
   commitScopeSheetChange(room, `Added room to ${currentScopeSheet.jobName}`, true);
@@ -2298,11 +2419,15 @@ function updateScopeRoomOtherText(roomId, value){
 function addScopeLine(roomId){
   const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
   if(!room) return;
-  const desc = document.getElementById(`scopeLineDesc_${roomId}`).value.trim();
-  const qty = document.getElementById(`scopeLineQty_${roomId}`).value.trim();
-  const unit = document.getElementById(`scopeLineUnit_${roomId}`).value.trim();
-  if(!desc){ showToast('Enter a location/material/action first'); return; }
-  room.scopeLines.push({ id: uid('SL'), text: desc, qty, unit, createdBy: currentUser.name, createdAt: nowIso() });
+  const d = getScopeLineDraft(roomId);
+  const desc = (d.desc||'').trim();
+  const qty = (d.qty||'').trim();
+  const unit = (d.unit||'').trim();
+  const action = d.action||'';
+  const photoRef = (d.photoRef||'').trim();
+  if(!desc){ showToast('Enter a location/material first'); return; }
+  room.scopeLines.push({ id: uid('SL'), text: desc, qty, unit, action, photoRef, createdBy: currentUser.name, createdAt: nowIso() });
+  delete scopeLineDraft[roomId];
   commitScopeSheetChange(room, `Added scope line "${desc}" to ${room.name||'a room'} (${currentScopeSheet.jobName})`, true);
 }
 function deleteScopeLine(roomId, lineId){
@@ -2312,23 +2437,6 @@ function deleteScopeLine(roomId, lineId){
   if(!confirm(`Delete "${line ? line.text : 'this line'}"?`)) return;
   room.scopeLines = room.scopeLines.filter(l=>l.id!==lineId);
   commitScopeSheetChange(room, `Deleted scope line "${line?line.text:''}" from ${room.name||'a room'} (${currentScopeSheet.jobName})`, true);
-}
-function addScopeReading(roomId){
-  const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
-  if(!room) return;
-  const moisture = document.getElementById(`scopeReadingMoisture_${roomId}`).value.trim();
-  const note = document.getElementById(`scopeReadingNote_${roomId}`).value.trim();
-  if(!moisture){ showToast('Enter a moisture reading first'); return; }
-  room.readings.push({ id: uid('RD'), moisture, note, createdBy: currentUser.name, createdAt: nowIso() });
-  commitScopeSheetChange(room, `Logged reading ${moisture} for ${room.name||'a room'} (${currentScopeSheet.jobName})`, true);
-}
-function deleteScopeReading(roomId, readingId){
-  const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
-  if(!room) return;
-  if(!confirm('Delete this reading?')) return;
-  const reading = room.readings.find(r=>r.id===readingId);
-  room.readings = room.readings.filter(r=>r.id!==readingId);
-  commitScopeSheetChange(room, `Deleted a reading (${reading?reading.moisture:''}) from ${room.name||'a room'} (${currentScopeSheet.jobName})`, true);
 }
 function renderScopeSheetDetail(){
   if(!currentScopeSheet) return;
@@ -2341,14 +2449,23 @@ function renderScopeSheetDetail(){
   const techHtml = techNames.map(name=>`
     <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;padding:3px 0;"><input type="checkbox" ${techList.includes(name)?'checked':''} onchange="toggleScopeTechnician('${name.replace(/'/g,"\\'")}',this.checked)"> ${escapeHtml(name)}</label>`).join('');
   const dailyLogs = (s.dailyLogs||[]).slice().sort((a,b)=>(b.date+ (b.time||'')).localeCompare(a.date+(a.time||'')));
-  const dailyLogRows = dailyLogs.map(l=>`
-    <div class="list-row">
+  const dailyLogRows = dailyLogs.map(l=>{
+    const roomReadingsLine = (l.roomReadings||[]).length
+      ? (l.roomReadings||[]).map(rr=>`${escapeHtml(rr.roomName)}: ${escapeHtml(rr.moisture)}`).join(' · ')
+      : '';
+    return `<div class="list-row">
       <div>
         <div class="nm">${fmtDateShort(l.date)}${l.time?` ${escapeHtml(l.time)}`:''} — ${l.tempF?escapeHtml(l.tempF)+'°F':'—'} / ${l.rh?escapeHtml(l.rh)+'%RH':'—'}${l.gpp!=null?` / ${l.gpp} GPP`:''}</div>
-        <div style="font-size:11px;color:var(--muted);">Dehus ${escapeHtml(l.dehus||'0')} · Air movers ${escapeHtml(l.airMovers||'0')} · Scrubbers ${escapeHtml(l.airScrubbers||'0')}${l.technician?` · ${escapeHtml(l.technician)}`:''}${l.notes?` — ${escapeHtml(l.notes)}`:''}</div>
+        ${roomReadingsLine ? `<div style="font-size:12px;color:var(--ink);margin-top:2px;">${roomReadingsLine}</div>` : ''}
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">Dehus ${escapeHtml(l.dehus||'0')} · Air movers ${escapeHtml(l.airMovers||'0')} · Scrubbers ${escapeHtml(l.airScrubbers||'0')}${l.technician?` · ${escapeHtml(l.technician)}`:''}${l.notes?` — ${escapeHtml(l.notes)}`:''}</div>
       </div>
       <button class="del-btn" onclick="deleteScopeDailyLog('${l.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-    </div>`).join('') || `<div class="empty">No daily readings logged yet.</div>`;
+    </div>`;
+  }).join('') || `<div class="empty">No daily readings logged yet.</div>`;
+  const d = scopeDailyLogDraft;
+  const roomMoistureFieldsHtml = s.rooms.length ? s.rooms.map(room=>`
+    <div class="dlog-field"><label>${escapeHtml(room.name)||'Untitled room'} — moisture</label><input type="text" inputmode="decimal" value="${escapeHtml((d.roomMoisture&&d.roomMoisture[room.id])||'')}" oninput="updateScopeDailyLogRoomMoisture('${room.id}', this.value)" placeholder="e.g. 18%"></div>`).join('')
+    : `<div class="empty">Add a room above to log moisture readings for it here.</div>`;
   document.getElementById('scopeSheetDetailBody').innerHTML = `
     ${reportLetterheadHtml('Room Scope Sheet')}
     <div class="field"><label>Property address</label><input value="${escapeHtml(s.propertyAddress)}" placeholder="Address" onchange="updateScopeSheetField('propertyAddress', this.value)"></div>
@@ -2361,23 +2478,19 @@ function renderScopeSheetDetail(){
     <button class="btn btn-gold" style="margin-top:6px;" onclick="addScopeRoom()">+ Add Room</button>
 
     <div class="card-eyebrow" style="margin-top:16px;">Daily atmospheric &amp; equipment log</div>
+    <div class="hint" style="margin-bottom:8px;">This is the one place to log a visit — moisture readings for each room, plus the day's temp/humidity and equipment on site.</div>
     ${dailyLogRows}
-    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
-      <div class="field" style="flex:1;min-width:120px;margin-bottom:6px;"><label>Date</label><input type="date" id="dailyLogDate" value="${todayStr()}"></div>
-      <div class="field" style="flex:1;min-width:90px;margin-bottom:6px;"><label>Time</label><input type="time" id="dailyLogTime"></div>
-    </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;">
-      <input id="dailyLogTemp" type="number" style="flex:1;min-width:70px;" placeholder="Temp °F">
-      <input id="dailyLogRH" type="number" style="flex:1;min-width:70px;" placeholder="RH %">
-      <input id="dailyLogDehus" type="number" style="flex:1;min-width:70px;" placeholder="Dehus">
-      <input id="dailyLogAirMovers" type="number" style="flex:1;min-width:70px;" placeholder="Air movers">
-      <input id="dailyLogAirScrubbers" type="number" style="flex:1;min-width:70px;" placeholder="Scrubbers">
-    </div>
-    <div style="display:flex;gap:6px;margin-top:6px;">
-      <input id="dailyLogTech" list="scopeDailyLogTechList" style="flex:1;" placeholder="Technician">
-      <input id="dailyLogNotes" style="flex:2;" placeholder="Notes (optional)">
-    </div>
+    <div class="dlog-field"><label>Date</label><input type="date" value="${escapeHtml(d.date||todayStr())}" oninput="updateScopeDailyLogDraft('date', this.value)"></div>
+    <div class="dlog-field"><label>Time</label><input type="time" value="${escapeHtml(d.time||'')}" oninput="updateScopeDailyLogDraft('time', this.value)"></div>
+    ${roomMoistureFieldsHtml}
+    <div class="dlog-field"><label>Temperature (°F)</label><input type="text" inputmode="decimal" value="${escapeHtml(d.tempF||'')}" oninput="updateScopeDailyLogDraft('tempF', this.value)" placeholder="e.g. 78"></div>
+    <div class="dlog-field"><label>Relative humidity (%)</label><input type="text" inputmode="decimal" value="${escapeHtml(d.rh||'')}" oninput="updateScopeDailyLogDraft('rh', this.value)" placeholder="e.g. 45"></div>
+    <div class="dlog-field"><label>Dehumidifiers on site</label><input type="text" inputmode="numeric" value="${escapeHtml(d.dehus||'')}" oninput="updateScopeDailyLogDraft('dehus', this.value)" placeholder="e.g. 2"></div>
+    <div class="dlog-field"><label>Air movers on site</label><input type="text" inputmode="numeric" value="${escapeHtml(d.airMovers||'')}" oninput="updateScopeDailyLogDraft('airMovers', this.value)" placeholder="e.g. 8"></div>
+    <div class="dlog-field"><label>Air scrubbers on site</label><input type="text" inputmode="numeric" value="${escapeHtml(d.airScrubbers||'')}" oninput="updateScopeDailyLogDraft('airScrubbers', this.value)" placeholder="e.g. 1"></div>
+    <div class="dlog-field"><label>Technician</label><input list="scopeDailyLogTechList" value="${escapeHtml(d.technician||'')}" oninput="updateScopeDailyLogDraft('technician', this.value)" placeholder="Name"></div>
     <datalist id="scopeDailyLogTechList">${techNames.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
+    <div class="dlog-field"><label>Notes</label><input value="${escapeHtml(d.notes||'')}" oninput="updateScopeDailyLogDraft('notes', this.value)" placeholder="Optional"></div>
     <button class="btn btn-ghost" style="margin-top:6px;" onclick="addScopeDailyLog()">+ Add daily reading</button>
 
     <div class="field" style="margin-top:16px;"><label>Final notes / verification</label>
@@ -2389,16 +2502,31 @@ function renderScopeSheetDetail(){
       <button class="btn btn-black" onclick="closeScopeSheetDetail()">Done</button>
     </div>`;
 }
+// A one-tap button row for a single-choice field (Water Category, Drying
+// Class, Yes/No toggles, Contents status) — `options` is either a flat
+// array of strings or an array of [value,label] pairs.
+function scopeChipRow(roomId, field, options){
+  const room = currentScopeSheet.rooms.find(r=>r.id===roomId);
+  const current = room ? room[field] : '';
+  return `<div class="scope-chip-row">${options.map(opt=>{
+    const val = Array.isArray(opt) ? opt[0] : opt;
+    const label = Array.isArray(opt) ? opt[1] : opt;
+    const sel = current===val;
+    const valAttr = String(val).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<button type="button" class="scope-chip${sel?' sel':''}" onclick="updateScopeRoomField('${roomId}','${field}','${valAttr}')">${escapeHtml(label)}</button>`;
+  }).join('')}</div>`;
+}
 function renderScopeRoomCard(room){
   const expanded = scopeRoomExpanded.has(room.id);
   const badge = attributionBadge(room.lastUpdatedBy, room.lastUpdatedAt);
+  const roomLabel = `Room ${room.roomNumber||1}`;
   if(!expanded){
     return `<div class="list-row" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:4px;" onclick="toggleScopeRoomExpanded('${room.id}')">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div class="nm">${escapeHtml(room.name)||'<span style="color:var(--muted);">Untitled room</span>'}</div>
+        <div class="nm">${roomLabel}${room.name ? ' — '+escapeHtml(room.name) : ' — <span style="color:var(--muted);">untitled</span>'}</div>
         ${badge}
       </div>
-      <div style="font-size:11.5px;color:var(--muted);">${room.readings.length} reading${room.readings.length===1?'':'s'} · ${room.scopeLines.length} scope line${room.scopeLines.length===1?'':'s'}</div>
+      <div style="font-size:11.5px;color:var(--muted);">${room.readings.length} moisture reading${room.readings.length===1?'':'s'} · ${room.scopeLines.length} scope line${room.scopeLines.length===1?'':'s'}</div>
     </div>`;
   }
   const materialsHtml = SCOPE_MATERIAL_KEYS.map(([k,label])=>`
@@ -2409,23 +2537,39 @@ function renderScopeRoomCard(room){
     <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;padding:3px 0;"><input type="checkbox" ${room.work[k]?'checked':''} onchange="updateScopeRoomCheckbox('${room.id}','work','${k}',this.checked)"> ${label}</label>`).join('');
   const linesHtml = room.scopeLines.map(l=>`
     <div class="list-row">
-      <div><div class="nm">${escapeHtml(l.text)}</div><div style="font-size:11px;color:var(--muted);">${escapeHtml(l.qty||'')} ${escapeHtml(l.unit||'')}</div></div>
+      <div><div class="nm">${escapeHtml(l.text)}${l.action?` <span style="font-weight:400;color:var(--muted);">— ${escapeHtml(l.action)}</span>`:''}</div><div style="font-size:11px;color:var(--muted);">${escapeHtml(l.qty||'')} ${escapeHtml(l.unit||'')}${l.photoRef?` · Photo ref: ${escapeHtml(l.photoRef)}`:''}</div></div>
       <button class="del-btn" onclick="deleteScopeLine('${room.id}','${l.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
     </div>`).join('') || `<div class="empty">No lines yet.</div>`;
-  const readingsHtml = room.readings.slice().sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).map(r=>`
-    <div class="list-row">
-      <div><div class="nm">${escapeHtml(r.moisture)}${r.note?` — ${escapeHtml(r.note)}`:''}</div></div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        ${attributionBadge(r.createdBy, r.createdAt)}
-        <button class="del-btn" onclick="deleteScopeReading('${room.id}','${r.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-      </div>
-    </div>`).join('') || `<div class="empty">No readings logged yet.</div>`;
+  // Moisture readings are logged once, down in the Daily Atmospheric &
+  // Equipment Log (per Clint's request to stop entering drying-log data in
+  // two places) — this card just shows the running count so it's still
+  // obvious from the room view whether anything's been logged for it yet.
+  const recentReadings = room.readings.slice().sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,3);
+  const recentReadingsHtml = recentReadings.length
+    ? `<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Latest: ${recentReadings.map(r=>`${escapeHtml(r.moisture)} (${fmtDateShort(r.createdAt.slice(0,10))})`).join(' · ')}</div>`
+    : '';
+  const ld = getScopeLineDraft(room.id);
   return `<div class="card" style="padding:14px;margin-bottom:10px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-      <input style="font-weight:700;flex:1;" placeholder="Room / area name" value="${escapeHtml(room.name)}" onchange="updateScopeRoomField('${room.id}','name',this.value)">
+      <div style="flex:1;">
+        <div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;">${roomLabel}</div>
+        <input style="font-weight:700;width:100%;" placeholder="Room / area name" value="${escapeHtml(room.name)}" onchange="updateScopeRoomField('${room.id}','name',this.value)">
+      </div>
       <button class="btn btn-ghost" style="width:auto;padding:6px 10px;" onclick="toggleScopeRoomExpanded('${room.id}')">Collapse</button>
     </div>
     <div style="margin:6px 0;">${badge}</div>
+    <div style="display:flex;gap:6px;margin-top:8px;">
+      <div class="field" style="flex:1;margin-bottom:8px;"><label>Floor</label><input value="${escapeHtml(room.floor||'')}" placeholder="e.g. 1st" onchange="updateScopeRoomField('${room.id}','floor',this.value)"></div>
+      <div class="field" style="flex:2;margin-bottom:8px;"><label>Cause / source</label><input value="${escapeHtml(room.causeSource||'')}" placeholder="e.g. Supply line failure" onchange="updateScopeRoomField('${room.id}','causeSource',this.value)"></div>
+    </div>
+    <div class="card-eyebrow">Source corrected?</div>
+    ${scopeChipRow(room.id,'sourceCorrected',[['yes','Yes'],['no','No']])}
+    <div style="display:flex;gap:14px;">
+      <div style="flex:1;"><div class="card-eyebrow">Water category</div>${scopeChipRow(room.id,'waterCategory',SCOPE_WATER_CATEGORIES)}</div>
+      <div style="flex:1;"><div class="card-eyebrow">Drying class</div>${scopeChipRow(room.id,'dryingClass',SCOPE_DRYING_CLASSES)}</div>
+    </div>
+    <div class="card-eyebrow">Pre-existing damage?</div>
+    ${scopeChipRow(room.id,'preExisting',[['yes','Yes'],['no','No']])}
     <div style="display:flex;gap:6px;margin-top:8px;">
       <div class="field" style="flex:1;margin-bottom:8px;"><label>L (ft)</label><input type="number" value="${room.lengthFt}" onchange="updateScopeRoomField('${room.id}','lengthFt',this.value)"></div>
       <div class="field" style="flex:1;margin-bottom:8px;"><label>W (ft)</label><input type="number" value="${room.widthFt}" onchange="updateScopeRoomField('${room.id}','widthFt',this.value)"></div>
@@ -2440,21 +2584,23 @@ function renderScopeRoomCard(room){
     <div style="display:grid;grid-template-columns:1fr 1fr;">${workHtml}</div>
     <div class="card-eyebrow" style="margin-top:10px;">Exact scope / quantities</div>
     ${linesHtml}
-    <div style="display:flex;gap:6px;margin-top:6px;">
-      <input id="scopeLineDesc_${room.id}" style="flex:2;" placeholder="Location / material / action">
-      <input id="scopeLineQty_${room.id}" style="flex:1;" placeholder="Qty">
-      <input id="scopeLineUnit_${room.id}" style="flex:1;" placeholder="Unit">
+    <div class="dlog-field" style="margin-top:8px;"><label>Location / material</label><input value="${escapeHtml(ld.desc||'')}" oninput="updateScopeLineDraft('${room.id}','desc',this.value)" placeholder="e.g. Baseboard, south wall"></div>
+    <div style="display:flex;gap:6px;">
+      <div class="dlog-field" style="flex:1;"><label>Qty</label><input value="${escapeHtml(ld.qty||'')}" oninput="updateScopeLineDraft('${room.id}','qty',this.value)"></div>
+      <div class="dlog-field" style="flex:1;"><label>Unit</label><input value="${escapeHtml(ld.unit||'')}" oninput="updateScopeLineDraft('${room.id}','unit',this.value)" placeholder="LF/SF/EA"></div>
     </div>
+    <div class="dlog-field"><label>Action</label><select onchange="updateScopeLineDraft('${room.id}','action',this.value)">
+      <option value="">Select...</option>
+      ${SCOPE_LINE_ACTIONS.map(a=>`<option value="${escapeHtml(a)}" ${ld.action===a?'selected':''}>${escapeHtml(a)}</option>`).join('')}
+    </select></div>
+    <div class="dlog-field"><label>Photo ref (optional)</label><input value="${escapeHtml(ld.photoRef||'')}" oninput="updateScopeLineDraft('${room.id}','photoRef',this.value)" placeholder="e.g. IMG_014"></div>
     <button class="btn btn-ghost" style="margin-top:6px;" onclick="addScopeLine('${room.id}')">+ Add line</button>
-    <div class="card-eyebrow" style="margin-top:10px;">Readings (moisture, over time)</div>
-    ${readingsHtml}
-    <div style="display:flex;gap:6px;margin-top:6px;">
-      <input id="scopeReadingMoisture_${room.id}" style="flex:1;" placeholder="Moisture %">
-      <input id="scopeReadingNote_${room.id}" style="flex:2;" placeholder="Note (optional)">
-    </div>
-    <button class="btn btn-ghost" style="margin-top:6px;" onclick="addScopeReading('${room.id}')">+ Add reading</button>
+    ${recentReadingsHtml}
     <div class="field" style="margin-top:10px;"><label>Equipment</label><input value="${escapeHtml(room.equipment)}" placeholder="e.g. 2 air movers, 1 dehu" onchange="updateScopeRoomField('${room.id}','equipment',this.value)"></div>
     <div class="field"><label>Photos</label><input value="${escapeHtml(room.photosNote)}" onchange="updateScopeRoomField('${room.id}','photosNote',this.value)"></div>
+    <div class="card-eyebrow" style="margin-top:10px;">Contents status</div>
+    ${scopeChipRow(room.id,'contentsStatus',SCOPE_CONTENTS_STATUSES)}
+    <div class="field"><label>Exceptions / limitations / customer decisions</label><input value="${escapeHtml(room.exceptionsNotes||'')}" placeholder="e.g. Customer declined contents pack-out" onchange="updateScopeRoomField('${room.id}','exceptionsNotes',this.value)"></div>
     <button class="btn btn-red" style="margin-top:4px;" onclick="deleteScopeRoom('${room.id}')">Delete this room</button>
   </div>`;
 }
@@ -2563,16 +2709,22 @@ function scopeRoomPrintHtml(room){
     ? `${room.lengthFt||'—'} x ${room.widthFt||'—'} x ${room.heightFt||'—'} ft` : '—';
   const materials = scopeChecklistSummary(room.materials, SCOPE_MATERIAL_KEYS, room.materials.other ? room.materials.otherText : '');
   const work = scopeChecklistSummary(room.work, SCOPE_WORK_KEYS, '');
+  const contentsLabel = (SCOPE_CONTENTS_STATUSES.find(([k])=>k===room.contentsStatus)||[,''])[1];
+  const yesNo = v => v==='yes' ? 'Yes' : v==='no' ? 'No' : '—';
   const linesHtml = room.scopeLines.length
-    ? `<ul style="margin:4px 0 0;padding-left:18px;">${room.scopeLines.map(l=>`<li>${escapeHtml(l.text)}${l.qty?` — ${escapeHtml(l.qty)} ${escapeHtml(l.unit||'')}`:''}</li>`).join('')}</ul>`
+    ? `<ul style="margin:4px 0 0;padding-left:18px;">${room.scopeLines.map(l=>`<li>${escapeHtml(l.text)}${l.action?` — ${escapeHtml(l.action)}`:''}${l.qty?` (${escapeHtml(l.qty)} ${escapeHtml(l.unit||'')})`:''}${l.photoRef?` [Photo: ${escapeHtml(l.photoRef)}]`:''}</li>`).join('')}</ul>`
     : '<div style="color:var(--muted);">None logged.</div>';
   return `<div class="scope-print-room">
-    <div style="font-size:15px;font-weight:800;margin-bottom:2px;">${escapeHtml(room.name)||'Untitled room'}</div>
+    <div style="font-size:15px;font-weight:800;margin-bottom:2px;">Room ${room.roomNumber||1}${room.name ? ' — '+escapeHtml(room.name) : ''}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Floor: ${escapeHtml(room.floor||'—')} &nbsp;·&nbsp; Cause/source: ${escapeHtml(room.causeSource||'—')} &nbsp;·&nbsp; Source corrected: ${yesNo(room.sourceCorrected)}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Water category: ${escapeHtml(room.waterCategory||'—')} &nbsp;·&nbsp; Drying class: ${escapeHtml(room.dryingClass||'—')} &nbsp;·&nbsp; Pre-existing damage: ${yesNo(room.preExisting)}</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Dimensions: ${dims} &nbsp;·&nbsp; Affected: ${escapeHtml(room.affectedArea||'—')} &nbsp;·&nbsp; Dry standard: ${escapeHtml(room.dryStandard||'—')}</div>
     <div style="font-size:12.5px;margin-bottom:3px;"><b>Affected materials:</b> ${escapeHtml(materials)}</div>
     <div style="font-size:12.5px;margin-bottom:3px;"><b>Work performed:</b> ${escapeHtml(work)}</div>
     <div style="font-size:12.5px;margin-bottom:3px;"><b>Equipment:</b> ${escapeHtml(room.equipment||'—')}</div>
-    <div style="font-size:12.5px;margin-bottom:8px;"><b>Photos:</b> ${escapeHtml(room.photosNote||'—')}</div>
+    <div style="font-size:12.5px;margin-bottom:3px;"><b>Contents status:</b> ${escapeHtml(contentsLabel||'—')}</div>
+    <div style="font-size:12.5px;margin-bottom:3px;"><b>Photos:</b> ${escapeHtml(room.photosNote||'—')}</div>
+    ${room.exceptionsNotes ? `<div style="font-size:12.5px;margin-bottom:8px;"><b>Exceptions / limitations:</b> ${escapeHtml(room.exceptionsNotes)}</div>` : ''}
     <div style="font-size:12.5px;font-weight:700;margin-top:6px;">Exact scope / quantities</div>
     ${linesHtml}
   </div>`;
@@ -2602,9 +2754,8 @@ function buildScopeSheetPrintHtml(s){
     <div class="card-eyebrow" style="margin-top:14px;">Final notes</div>
     <div style="font-size:12.5px;white-space:pre-wrap;">${escapeHtml(s.finalNotes || DEFAULT_SCOPE_FINAL_NOTE)}</div>
 
-    <div style="display:flex;gap:40px;margin-top:34px;">
-      <div style="flex:1;border-top:1px solid #10202E;padding-top:4px;font-size:11px;color:var(--muted);">Technician signature / initials</div>
-      <div style="flex:1;border-top:1px solid #10202E;padding-top:4px;font-size:11px;color:var(--muted);">Date</div>
+    <div style="margin-top:24px;padding-top:10px;border-top:1px solid #10202E;font-size:11.5px;color:var(--muted);">
+      Prepared by: ${escapeHtml(techList.join(', ')||s.createdBy||'—')} &nbsp;·&nbsp; Printed ${fmtDateShort(todayStr())}
     </div>`;
 }
 function printScopeSheetReport(){
