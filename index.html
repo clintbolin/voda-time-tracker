@@ -304,6 +304,9 @@ main.content{padding:16px 14px 4px;}
 @media print{
   body.printing-report > *:not(#printRoot){ display:none !important; }
   body.printing-report{ background:#fff !important; padding:0 !important; min-height:0 !important; }
+  body.printing-report #printRoot,
+  body.printing-report #printRoot *{ animation:none !important; transition:none !important; opacity:1; }
+  body.printing-report #printRoot .sheet{ max-height:none !important; overflow:visible !important; border-radius:0; padding:0; max-width:none; }
   body.printing-report #printRoot{
     display:block !important;
     /* Always print light, even if the app is in dark mode */
@@ -398,7 +401,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Manage vehicles</div><div class="sheet-sub">Shown in the Pre-Trip vehicle list</div></div>
-    <button class="close-x" onclick="closeModal('modalVehicles')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalVehicles')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div class="field">
     <label>Add a vehicle</label>
@@ -415,7 +418,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Manage job list</div><div class="sheet-sub">Shown as suggestions when techs log a job</div></div>
-    <button class="close-x" onclick="closeModal('modalJobs')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalJobs')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div class="hint" style="margin-top:0;">This list keeps job names consistent across techs until job names can be pulled directly from Job Tracker. Add the job names your team should pick from below.</div>
   <div class="field">
@@ -434,7 +437,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Reports</div><div class="sheet-sub">Everything in one place</div></div>
-    <button class="close-x" onclick="closeModal('modalReportsHub')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalReportsHub')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div style="display:flex;flex-direction:column;gap:8px;">
     <button class="btn btn-gold" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openLaborApproval()">Weekly labor approval (send to Job Tracker)</button>
@@ -442,7 +445,7 @@ main.content{padding:16px 14px 4px;}
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openWhosOn()">Who's clocked in now</button>
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openDailyReport()">Daily hours report</button>
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openWeeklyReport()">Weekly hours report (Mon&ndash;Sun)</button>
-    <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openPayrollReport()">2-week payroll report</button>
+    <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openPayrollReport()">Payroll report</button>
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openEmployeeReport()">Employee report (by name)</button>
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openJobReport()">Job report (by job name)</button>
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openDetailedLaborReport()">Detailed labor report (by day)</button>
@@ -460,7 +463,7 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">Weekly labor approval</div><div class="sheet-sub">Review last week's hours, then send them to Job Tracker</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      <button class="close-x" onclick="closeModal('modalLaborApproval')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="close-x" onclick="closeModalBack('modalLaborApproval')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
   <div id="laborApprovalBody"></div>
@@ -473,7 +476,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Help &amp; Guide</div><div class="sheet-sub">How to use the Time Tracker</div></div>
-    <button class="close-x" onclick="closeModal('modalHelpTech')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalHelpTech')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
 
   <div class="help-section">
@@ -506,14 +509,14 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Admin &amp; Office Guide</div><div class="sheet-sub">Reports, corrections, and settings</div></div>
-    <button class="close-x" onclick="closeModal('modalHelp')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalHelp')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
 
   <div class="help-section">
     <div class="help-h"><span class="num">1</span>Reports</div>
     <div class="help-p">Everything below lives under the Admin link at the bottom of the screen, inside Reports. What you see there depends on your permissions.</div>
     <div class="help-bullet">Who's clocked in right now</div>
-    <div class="help-bullet">Daily / Weekly / Payroll reports — Weekly and Payroll let you pick the Biweekly or Weekly crew</div>
+    <div class="help-bullet">Daily / Weekly / Payroll reports — Weekly and Payroll let you pick the Bi-Weekly or Weekly crew</div>
     <div class="help-bullet">Employee report — by name, any date range</div>
     <div class="help-bullet">Job report — everyone who worked a job, and a Send button to push hours to Job Tracker</div>
     <div class="help-bullet">Detailed labor report — per-day cost breakdown including overtime</div>
@@ -543,7 +546,7 @@ main.content{padding:16px 14px 4px;}
     <div class="help-bullet">Add or remove vehicles from the Pre-Trip list</div>
     <div class="help-bullet">Manually add jobs that aren't pulled from Job Tracker</div>
     <div class="help-bullet">Job Tracker jobs drop off the list automatically 60 days after landing</div>
-    <div class="help-bullet">Hours go to Job Tracker <b>once a week</b>, after you approve them: Reports &rarr; Weekly labor approval. Each Monday the Biweekly crew's week is ready, and each Friday the Weekly crew's. You'll see a gold banner until it's done.</div>
+    <div class="help-bullet">Hours go to Job Tracker <b>once a week</b>, after you approve them: Reports &rarr; Weekly labor approval. Each Monday the Bi-Weekly crew's week is ready, and each Friday the Weekly crew's. You'll see a gold banner until it's done.</div>
     <div class="help-bullet">Each job gets one line per employee for the week, with overtime blended in. If hours are fixed after a week was sent, that week comes back with just the difference as an adjustment.</div>
   </div>
 
@@ -559,7 +562,7 @@ main.content{padding:16px 14px 4px;}
 
   <div class="sheet-head">
     <div><div class="sheet-title">Login PIN</div><div class="sheet-sub">The shared PIN everyone enters to open the app</div></div>
-    <button class="close-x" onclick="closeModal('modalLoginPin')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalLoginPin')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div class="hint" style="margin-top:0;">Change this any time — for example when someone leaves the company. Everyone will need the new PIN the next time they open the app on a device that isn't already unlocked.</div>
   <div class="field">
@@ -597,7 +600,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Team tools</div><div class="sheet-sub" id="adminAsLabel"></div></div>
-    <button class="close-x" onclick="closeModal('modalAdmin')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalAdmin')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div id="adminMenuList" style="display:flex;flex-direction:column;gap:8px;"></div>
 </div></div>
@@ -607,7 +610,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Who's clocked in</div><div class="sheet-sub">Live status, right now</div></div>
-    <button class="close-x" onclick="closeModal('modalWhosOn')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalWhosOn')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div id="whosOnList"></div>
 </div></div>
@@ -619,7 +622,7 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">Daily hours</div><div class="sheet-sub">One day, every employee</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      <button class="close-x" onclick="closeModal('modalDailyReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="close-x" onclick="closeModalBack('modalDailyReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
   <div class="field"><label>Date</label><input type="date" id="dailyReportDate" onchange="renderDailyReport()"></div>
@@ -633,12 +636,12 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">Weekly hours</div><div class="sheet-sub">One week, by pay schedule</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      <button class="close-x" onclick="closeModal('modalWeeklyReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="close-x" onclick="closeModalBack('modalWeeklyReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
   <div class="field"><label>Pay schedule</label>
     <select id="weeklyReportSchedule" onchange="renderWeeklyReport()">
-      <option value="biweekly">Biweekly crew (Mon&ndash;Sun weeks)</option>
+      <option value="biweekly">Bi-Weekly crew (Mon&ndash;Sun weeks)</option>
       <option value="weekly">Weekly crew (Fri&ndash;Thu weeks)</option>
     </select>
   </div>
@@ -654,12 +657,12 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">Payroll report</div><div class="sheet-sub">One page per employee, by pay schedule</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      <button class="close-x" onclick="closeModal('modalPayrollReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="close-x" onclick="closeModalBack('modalPayrollReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
   <div class="field"><label>Pay schedule</label>
     <select id="payrollSchedule" onchange="onPayrollScheduleChange()">
-      <option value="biweekly">Biweekly crew (2 weeks, Mon&ndash;Sun)</option>
+      <option value="biweekly">Bi-Weekly crew (2 weeks, Mon&ndash;Sun)</option>
       <option value="weekly">Weekly crew (1 week, Fri&ndash;Thu)</option>
     </select>
   </div>
@@ -674,7 +677,7 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">Employee report</div><div class="sheet-sub">Jobs worked, hours, and payroll breakdown</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      <button class="close-x" onclick="closeModal('modalEmployeeReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="close-x" onclick="closeModalBack('modalEmployeeReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
   <div class="field"><label>Employee</label>
@@ -695,7 +698,7 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">Job report</div><div class="sheet-sub">Everyone who worked a job, with dates &amp; times</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      <button class="close-x" onclick="closeModal('modalJobReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="close-x" onclick="closeModalBack('modalJobReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
   <div class="field"><label>Job name</label>
@@ -717,7 +720,7 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">Detailed labor report</div><div class="sheet-sub">Employee, jobs, hours &amp; cost — per day</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      <button class="close-x" onclick="closeModal('modalDetailedLabor')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="close-x" onclick="closeModalBack('modalDetailedLabor')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
   <div style="display:flex;gap:8px;">
@@ -734,7 +737,7 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">Edit history</div><div class="sheet-sub">Every change made through Adjust Time Entries</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      <button class="close-x" onclick="closeModal('modalAuditLog')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="close-x" onclick="closeModalBack('modalAuditLog')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
   <div style="display:flex;gap:8px;">
@@ -751,7 +754,7 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">Shift times needing review</div><div class="sheet-sub">A missing clock-out, or a clock-in/out that doesn't add up</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      <button class="close-x" onclick="closeModal('modalStaleShifts')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="close-x" onclick="closeModalBack('modalStaleShifts')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
   <div id="staleShiftsBody"></div>
@@ -764,7 +767,7 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">Employee sign-offs</div><div class="sheet-sub">Who has certified their hours, and when</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      <button class="close-x" onclick="closeModal('modalSignoffsReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="close-x" onclick="closeModalBack('modalSignoffsReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
   <div id="signoffsReportBody"></div>
@@ -777,7 +780,7 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">Labor sync log</div><div class="sheet-sub">Every session sent to Job Tracker — hours &amp; dollars together</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      <button class="close-x" onclick="closeModal('modalLaborSyncLog')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="close-x" onclick="closeModalBack('modalLaborSyncLog')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
   <div style="display:flex;gap:8px;">
@@ -793,7 +796,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Job Calendar</div><div class="sheet-sub">Status of every job, by the date it landed</div></div>
-    <button class="close-x" onclick="closeModal('modalJobCalendar')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalJobCalendar')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
     <button class="btn btn-ghost" style="width:auto;padding:8px 14px;" onclick="shiftCalendarMonth(-1)">&larr;</button>
@@ -813,7 +816,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title" id="calJobDetailName"></div><div class="sheet-sub" id="calJobDetailStatus"></div></div>
-    <button class="close-x" onclick="closeModal('modalCalendarJobDetail')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalCalendarJobDetail')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div id="calJobDetailBody"></div>
 </div></div>
@@ -822,7 +825,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">My Hours</div><div class="sheet-sub">Review and certify your time</div></div>
-    <button class="close-x" onclick="closeModal('modalMySignoff')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalMySignoff')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
     <button class="btn btn-ghost" style="width:auto;padding:8px 14px;" onclick="shiftMyHoursCalMonth(-1)">&larr;</button>
@@ -846,7 +849,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title" id="myDayDetailDate"></div><div class="sheet-sub" id="myDayDetailTotal"></div></div>
-    <button class="close-x" onclick="closeModal('modalMyDayDetail')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalMyDayDetail')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div id="myDayDetailBody"></div>
 </div></div>
@@ -856,7 +859,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Scope Sheets</div><div class="sheet-sub">Room scope, quantities, and readings by job</div></div>
-    <button class="close-x" onclick="closeModal('modalScopeSheetsHub')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalScopeSheetsHub')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div class="field">
     <label>Find or start a job's scope sheet</label>
@@ -881,7 +884,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Adjust time entries</div><div class="sheet-sub">Fix a shift, job time, or delete a bad row</div></div>
-    <button class="close-x" onclick="closeModal('modalAdjustTimes')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="close-x" onclick="closeModalBack('modalAdjustTimes')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div class="field"><label>Employee</label>
     <input id="adjustEmpName" list="adjustEmpNameList" placeholder="Type or choose an employee" onchange="loadAdjustEntry()">
@@ -915,7 +918,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-10-05T23-40";
+const BUILD_ID = "2026-10-05T23-55";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -1020,15 +1023,50 @@ function showToast(msg){
   window._toastTimer = setTimeout(()=>t.classList.remove('show'), duration);
 }
 let _openModalCount = 0;
+/* ---- Back navigation between screens ----
+   Menus open a screen by closing themselves and opening the next one in
+   the same tap (e.g. Reports -> Weekly hours). openModal notices that and
+   remembers which screen it came from, so closing the report (the X, or
+   finishing a save) goes back to the Reports list instead of all the way
+   home. Opening a screen directly (not from another one) clears that, so
+   back never jumps somewhere unexpected. */
+const modalParent = {};
+let _lastClosedModal = null, _lastClosedAt = 0;
+// Screens whose contents need rebuilding when you come back to them
+const MODAL_REOPENERS = {
+  modalAdmin: () => openAdminMenu(),
+  modalScopeSheetsHub: () => openScopeSheetsHub(),
+  modalStaleShifts: () => openStaleShiftsReport(),
+  modalLaborApproval: () => { renderLaborApproval(); openModal('modalLaborApproval'); },
+};
 function openModal(id){
-  document.getElementById(id).classList.add('active');
+  const el = document.getElementById(id);
+  if(el.classList.contains('active')) return;
+  if(_lastClosedModal && _lastClosedModal!==id && (Date.now()-_lastClosedAt) < 400) modalParent[id] = _lastClosedModal;
+  else delete modalParent[id];
+  _lastClosedModal = null;
+  el.classList.add('active');
   _openModalCount++;
   document.body.style.overflow = 'hidden';
 }
 function closeModal(id){
-  document.getElementById(id).classList.remove('active');
+  const el = document.getElementById(id);
+  if(!el.classList.contains('active')) return;
+  el.classList.remove('active');
   _openModalCount = Math.max(0, _openModalCount - 1);
   if(_openModalCount === 0) document.body.style.overflow = '';
+  _lastClosedModal = id; _lastClosedAt = Date.now();
+}
+// Close this screen and return to the one it was opened from, if any.
+function closeModalBack(id){
+  closeModal(id);
+  _lastClosedModal = null; // returning is not "opening from here"
+  const parent = modalParent[id];
+  delete modalParent[id];
+  if(!parent || document.getElementById(parent).classList.contains('active')) return;
+  const grandparent = modalParent[parent];
+  if(MODAL_REOPENERS[parent]) MODAL_REOPENERS[parent](); else openModal(parent);
+  if(grandparent) modalParent[parent] = grandparent; // keep the chain so the next back still works
 }
 
 /* ============ AUTH (Google Sign-In + approval + roles) — same pattern as Job Tracker ============ */
@@ -1520,7 +1558,7 @@ function deleteEmployeeDraftPermanently(origName){
 }
 function cancelEmployeeEdits(){
   employeesDraft = null;
-  closeModal('modalEmployees');
+  closeModalBack('modalEmployees');
 }
 let employeeSaveInFlight = false;
 async function saveEmployeeEdits(){
@@ -1549,7 +1587,7 @@ async function saveEmployeeEdits(){
   const ok = await saveEmployees();
   if(ok && renamedEntries.length) await saveEntriesMerged(renamedEntries);
   employeeSaveInFlight = false;
-  if(ok){ showToast('Employee changes saved'); renderAdminFooter(); closeModal('modalEmployees'); }
+  if(ok){ showToast('Employee changes saved'); renderAdminFooter(); closeModalBack('modalEmployees'); }
 }
 
 /* ============ TEAM TOOLS MENU (per-employee permissions, no PIN) ============ */
@@ -1595,7 +1633,7 @@ async function confirmChangeLoginPin(){
     if(!res || !res.ok){ showToast('Save failed — backend rejected the update'); return; }
     document.getElementById('newLoginPinInput').value = '';
     showToast('Login PIN updated');
-    closeModal('modalLoginPin');
+    closeModalBack('modalLoginPin');
   }catch(e){ showToast('Save failed — check your connection'); }
 }
 function openReportsHub(){
@@ -1713,7 +1751,7 @@ async function pushLaborCostToJobTracker(jobId, employeeName, amount, note){
    Hours used to go to Job Tracker every time someone clocked out, which
    filled each job with one small line per person per day. Now nothing is
    sent until a finished week is reviewed and approved:
-     - Monday: the Biweekly crew's Mon–Sun week that just ended
+     - Monday: the Bi-Weekly crew's Mon–Sun week that just ended
      - Friday: the Weekly crew's Fri–Thu week that just ended
    Approving sends ONE line per employee per job for that week (hours and
    dollars, overtime blended in), all in a single update to Job Tracker.
@@ -1785,7 +1823,7 @@ function checkLaborApprovalPrompt(allowAutoOpen){
   if(!pending.length){ el.style.display = 'none'; return; }
   el.style.display = '';
   el.innerHTML = pending.length===1
-    ? `${pending[0].sched==='weekly'?'Weekly':'Biweekly'} crew hours for ${fmtDateShort(pending[0].weekStart)} \u2013 ${fmtDateShort(pending[0].weekEnd)} are ready to review and send to Job Tracker \u2192`
+    ? `${pending[0].sched==='weekly'?'Weekly':'Bi-Weekly'} crew hours for ${fmtDateShort(pending[0].weekStart)} \u2013 ${fmtDateShort(pending[0].weekEnd)} are ready to review and send to Job Tracker \u2192`
     : `${pending.length} weeks of hours are ready to review and send to Job Tracker \u2192`;
   const key = 'vodaLaborPromptShown_' + currentUser.name;
   if(allowAutoOpen && localStorage.getItem(key) !== todayStr()){
@@ -1810,7 +1848,7 @@ function renderLaborApproval(){
     const pending = pendingLaborWeeks();
     if(!pending.length){
       wrap.innerHTML = `<div class="empty">All caught up \u2014 every finished week has been sent to Job Tracker.</div>
-        <div class="hint">The Biweekly crew's week is ready each Monday, and the Weekly crew's week each Friday.</div>`;
+        <div class="hint">The Bi-Weekly crew's week is ready each Monday, and the Weekly crew's week each Friday.</div>`;
       return;
     }
     wrap.innerHTML = `<div class="hint" style="margin-top:0;">Pick a week to review. Nothing is sent until you approve it.</div>` +
@@ -1818,7 +1856,7 @@ function renderLaborApproval(){
         const total = w.lines.reduce((s,l)=>s+l.amount,0);
         return `<div class="list-row" style="cursor:pointer;" onclick="selectLaborWeek('${w.sched}','${w.weekStart}')">
           <div>
-            <div class="nm">${w.sched==='weekly'?'Weekly':'Biweekly'} crew \u2014 ${fmtDateShort(w.weekStart)} \u2013 ${fmtDateShort(w.weekEnd)}</div>
+            <div class="nm">${w.sched==='weekly'?'Weekly':'Bi-Weekly'} crew \u2014 ${fmtDateShort(w.weekStart)} \u2013 ${fmtDateShort(w.weekEnd)}</div>
             <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">${w.lines.length} line${w.lines.length===1?'':'s'} to send \u00b7 $${total.toFixed(2)}${w.flagged.length?` \u00b7 <span style="color:var(--red);font-weight:700;">\u26a0 ${w.flagged.length} need${w.flagged.length===1?'s':''} fixing</span>`:''}</div>
           </div>
           <span style="color:var(--muted);font-size:18px;">\u203a</span>
@@ -1828,7 +1866,7 @@ function renderLaborApproval(){
   }
   const { sched, weekStart } = laborApprovalSelected;
   const w = buildLaborWeek(sched, weekStart);
-  const crewLabel = sched==='weekly' ? 'Weekly' : 'Biweekly';
+  const crewLabel = sched==='weekly' ? 'Weekly' : 'Bi-Weekly';
   const letterhead = reportLetterheadHtml(`Weekly Labor Approval &mdash; ${crewLabel} Crew, ${fmtDateShort(w.weekStart)} \u2013 ${fmtDateShort(w.weekEnd)}`);
   const names = Object.keys(w.employeeTotals).sort((a,b)=>a.localeCompare(b));
   const totalsRows = names.map(n=>{
@@ -1904,7 +1942,7 @@ async function approveLaborWeek(sched, weekStart){
   if(!w.lines.length){ showToast('Nothing to send for this week'); return; }
   const total = w.lines.reduce((s,l)=>s+l.amount,0);
   const range = `${fmtDateShort(w.weekStart)} \u2013 ${fmtDateShort(w.weekEnd)}`;
-  if(!confirm(`Send ${w.lines.length} line${w.lines.length===1?'':'s'} ($${total.toFixed(2)} total) to Job Tracker for the ${sched==='weekly'?'Weekly':'Biweekly'} crew, ${range}?`)) return;
+  if(!confirm(`Send ${w.lines.length} line${w.lines.length===1?'':'s'} ($${total.toFixed(2)} total) to Job Tracker for the ${sched==='weekly'?'Weekly':'Bi-Weekly'} crew, ${range}?`)) return;
   laborApprovalSending = true;
   showToast('Sending to Job Tracker\u2026');
   const shortRange = `${fmtDateShort(w.weekStart).replace(/, \d{4}$/,'')}\u2013${fmtDateShort(w.weekEnd).replace(/, \d{4}$/,'')}`;
@@ -1932,7 +1970,7 @@ async function approveLaborWeek(sched, weekStart){
       });
     });
     if(changed.size) await saveEntriesMerged([...changed.values()]);
-    logAudit('Weekly labor approval', w.weekStart, [`Approved and sent ${sent.length} line(s), $${sent.reduce((s,l)=>s+l.amount,0).toFixed(2)}, for the ${sched==='weekly'?'Weekly':'Biweekly'} crew, ${range}`]);
+    logAudit('Weekly labor approval', w.weekStart, [`Approved and sent ${sent.length} line(s), $${sent.reduce((s,l)=>s+l.amount,0).toFixed(2)}, for the ${sched==='weekly'?'Weekly':'Bi-Weekly'} crew, ${range}`]);
     laborApprovalSending = false;
     if(skipped.length){
       alert(`Sent ${sent.length} line(s). ${skipped.length} couldn't be sent:\n\n` + skipped.map(x=>`\u2022 ${x.line.jobName} (${x.line.name}): ${x.reason}`).join('\n') + `\n\nThose stay on the list until the job is fixed in Job Tracker.`);
@@ -2275,12 +2313,12 @@ function addDays(dateStr, n){
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 /* ---- Pay schedules ----
-   Biweekly (the default): Mon–Sun weeks, paid every two weeks.
+   Bi-Weekly (the default): Mon–Sun weeks, paid every two weeks.
    Weekly: Fri–Thu weeks, paid every week.
    This only changes how weeks are counted (overtime, weekly totals,
    payroll periods) — never what screens someone sees. Anyone not on the
    employee list (e.g. a deleted name still in old entries) counts as
-   Biweekly. */
+   Bi-Weekly. */
 function fridayOf(dateStr){
   const d = new Date(dateStr+'T00:00:00');
   const back = (d.getDay() + 2) % 7; // days since the most recent Friday
@@ -2292,7 +2330,7 @@ function paySchedule(name){
   return (emp && emp.paySchedule==='weekly') ? 'weekly' : 'biweekly';
 }
 function payScheduleLabel(sched){
-  return sched==='weekly' ? 'Weekly (Fri–Thu)' : 'Biweekly (Mon–Sun)';
+  return sched==='weekly' ? 'Weekly (Fri–Thu)' : 'Bi-Weekly (Mon–Sun)';
 }
 function weekStartForSchedule(sched, dateStr){
   return sched==='weekly' ? fridayOf(dateStr) : mondayOf(dateStr);
@@ -2307,7 +2345,7 @@ function weekStartFor(name, dateStr){
 // (40×$20 + 4×$30) ÷ 44 = $21.36/hr on every hour logged that week. This
 // keeps day/job-level dollar figures summing exactly to the true weekly
 // total without needing to arbitrarily assign OT to one job over another.
-// weekStart is that employee's own week start (a Monday for Biweekly, a
+// weekStart is that employee's own week start (a Monday for Bi-Weekly, a
 // Friday for Weekly) — always get it from weekStartFor(name, date).
 function weekEffectiveRate(employeeName, weekStart, baseRate){
   if(!baseRate) return 0;
@@ -2329,7 +2367,10 @@ function renderWeeklyReport(){
   const days = Array.from({length:7}, (_,i)=>addDays(monday,i));
   document.getElementById('weeklyReportSummary').textContent = `${payScheduleLabel(sched)} \u2014 week of ${fmtDateShort(monday)} \u2013 ${fmtDateShort(days[6])}`;
   const names = [...new Set([...employees.map(e=>e.name), ...entries.map(e=>e.employeeName)])].filter(n=>paySchedule(n)===sched).sort((a,b)=>a.localeCompare(b));
-  const dayLabels = days.map(d=>new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'}));
+  const dayLabels = days.map(d=>{
+    const dt = new Date(d+'T00:00:00');
+    return `${dt.toLocaleDateString('en-US',{weekday:'short'})}<br><span style="font-weight:500;font-size:11px;opacity:.85;">${dt.getMonth()+1}/${dt.getDate()}</span>`;
+  });
   let rowsHtml = '';
   names.forEach(name=>{
     let totalMs = 0, anyStale = false;
@@ -2346,9 +2387,9 @@ function renderWeeklyReport(){
     rowsHtml += `<tr><td>${escapeHtml(name)}</td>${cells.map(c=>`<td>${c}</td>`).join('')}<td><b>${fmtDuration(totalMs)}</b></td></tr>`;
   });
   const wrap = document.getElementById('weeklyReportBody');
-  const letterhead = reportLetterheadHtml(`Weekly Hours Report &mdash; ${sched==='weekly'?'Weekly':'Biweekly'} Crew`);
-  if(!rowsHtml){ wrap.innerHTML = letterhead + `<div class="empty">No hours logged this week for the ${sched==='weekly'?'Weekly':'Biweekly'} crew.</div>`; return; }
-  wrap.innerHTML = letterhead + `<table class="report-table"><thead><tr><th>Employee</th>${dayLabels.map(d=>`<th>${d}</th>`).join('')}<th>Total</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+  const letterhead = reportLetterheadHtml(`Weekly Hours Report &mdash; ${sched==='weekly'?'Weekly':'Bi-Weekly'} Crew`);
+  if(!rowsHtml){ wrap.innerHTML = letterhead + `<div class="empty">No hours logged this week for the ${sched==='weekly'?'Weekly':'Bi-Weekly'} crew.</div>`; return; }
+  wrap.innerHTML = letterhead + `<table class="report-table"><thead><tr><th>Employee</th>${dayLabels.map(d=>`<th style="text-align:center;">${d}</th>`).join('')}<th>Total</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
 }
 
 /* ============ 2-WEEK PAYROLL REPORT ============ */
@@ -2377,7 +2418,7 @@ function renderPayrollReport(){
   const numDays = sched==='weekly' ? 7 : 14;
   const days = Array.from({length:numDays}, (_,i)=>addDays(start,i));
   const lastDay = days[days.length-1];
-  const reportTitle = sched==='weekly' ? 'Weekly Payroll Report' : '2-Week Payroll Report';
+  const reportTitle = 'Payroll Report';
   const names = [...new Set([...employees.map(e=>e.name), ...entries.map(e=>e.employeeName)])].filter(n=>paySchedule(n)===sched).sort((a,b)=>a.localeCompare(b));
   let html = '';
   names.forEach(name=>{
@@ -2406,7 +2447,7 @@ function renderPayrollReport(){
       </div>
     </div>`;
   });
-  wrap.innerHTML = html || `<div class="empty">No hours logged in this period for the ${sched==='weekly'?'Weekly':'Biweekly'} crew.</div>`;
+  wrap.innerHTML = html || `<div class="empty">No hours logged in this period for the ${sched==='weekly'?'Weekly':'Bi-Weekly'} crew.</div>`;
 }
 
 /* ============ PRINTING (clean, full-page reports) ============
@@ -2437,11 +2478,18 @@ function collectReportFilters(container){
 }
 function printReportContent(contentNode, filtersHtml){
   const root = document.getElementById('printRoot');
-  const clone = contentNode.cloneNode(true);
-  clone.removeAttribute('id');
+  // Copy the CONTENTS into a plain container — copying the pop-up sheet
+  // itself brought along its slide-in animation, which starts invisible,
+  // so phones/printers captured a blank page.
+  const clone = document.createElement('div');
+  clone.className = 'print-report';
+  [...contentNode.childNodes].forEach(n=>clone.appendChild(n.cloneNode(true)));
   clone.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));
   clone.querySelectorAll('button, input, select, textarea, datalist, .sheet-handle, .sheet-head, .field, .close-x, .del-btn').forEach(n=>n.remove());
   clone.querySelectorAll('[style]').forEach(n=>{ if(/overflow/.test(n.getAttribute('style'))) n.style.overflow = 'visible'; });
+  // The company letterhead always prints first, above any summary line
+  const firstLh = clone.querySelector('.report-letterhead');
+  if(firstLh && !firstLh.closest('.payroll-page')) clone.prepend(firstLh);
   if(filtersHtml){
     const holder = document.createElement('div');
     holder.innerHTML = filtersHtml;
@@ -2833,7 +2881,7 @@ function openScopeSheetForJob(jobName){
 }
 function closeScopeSheetDetail(){
   currentScopeSheet = null;
-  closeModal('modalScopeSheetDetail');
+  closeModalBack('modalScopeSheetDetail');
 }
 // Every mutation funnels through here: stamps who/when on the room (and the
 // sheet), saves it, and re-renders. `auditSummary`, when given, also adds a
@@ -3905,7 +3953,7 @@ function renderEmployeeReport(){
     ${jobsTable}
     <div class="card-eyebrow" style="margin-top:16px;">Weekly totals &mdash; ${payScheduleLabel(empSched)}${empSched==='weekly' ? ' (each week is one pay period)' : ''}</div>
     ${weeklyTable}
-    ${empSched==='biweekly' ? `<div class="card-eyebrow" style="margin-top:16px;">Biweekly totals (payroll)</div>${biweeklyTable}` : ''}
+    ${empSched==='biweekly' ? `<div class="card-eyebrow" style="margin-top:16px;">Bi-Weekly totals (payroll)</div>${biweeklyTable}` : ''}
     <div class="hint" style="margin-top:12px;font-weight:700;color:var(--ink);">Grand total: ${fmtDuration(grandTotal)}</div>`;
 }
 
@@ -4599,7 +4647,7 @@ async function deleteAdjustEntireEntry(){
     if(todayEntry && todayEntry.id===adjustDraft.id){ todayEntry = null; renderToday(); }
     adjustDraft = null;
     adjustOriginal = null;
-    closeModal('modalAdjustTimes');
+    closeModalBack('modalAdjustTimes');
   }
 }
 let adjustSaveInFlight = false;
@@ -4655,7 +4703,7 @@ async function saveAdjustTimes(){
       renderToday();
     }
     adjustOriginal = null;
-    closeModal('modalAdjustTimes');
+    closeModalBack('modalAdjustTimes');
   }
 }
 
