@@ -299,6 +299,40 @@ main.content{padding:16px 14px 4px;}
 .report-letterhead .rl-title{font-size:17px;font-weight:800;color:var(--ink);margin-top:1px;}
 .report-letterhead .rl-date{font-size:11px;color:var(--muted);margin-top:2px;}
 
+/* ---- Professional print layout (see printReportContent) ---- */
+#printRoot{ display:none; }
+@media print{
+  body.printing-report > *:not(#printRoot){ display:none !important; }
+  body.printing-report{ background:#fff !important; padding:0 !important; min-height:0 !important; }
+  body.printing-report #printRoot{
+    display:block !important;
+    /* Always print light, even if the app is in dark mode */
+    --ink:#10202E; --muted:#555E6B; --line:#C9D0D8; --gray-bg:#F1F3F5; --card:#fff; --bg:#fff;
+    --red:#B4232F; --red-bg:#FBE7EA; --green:#1F7A4F; --amber:#9A6A0F; --black:#0A0A0A;
+    color:#10202E; background:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:10.5pt; line-height:1.4;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  #printRoot .report-letterhead{ margin-bottom:10px; padding-bottom:10px; }
+  #printRoot .report-letterhead img{ height:42px; }
+  #printRoot .rl-title{ font-size:15pt !important; }
+  #printRoot .print-filters{ font-size:10pt; color:#333; background:#F1F3F5; border-radius:6px; padding:7px 10px; margin:0 0 12px; }
+  #printRoot .report-table{ width:100% !important; border-collapse:collapse; font-size:9.5pt; table-layout:auto; }
+  #printRoot .report-table thead{ display:table-header-group; }
+  #printRoot .report-table tr{ break-inside:avoid; page-break-inside:avoid; }
+  #printRoot .report-table th{ background:#0A0A0A !important; color:#fff !important; padding:6px 7px; font-size:9pt; white-space:nowrap; }
+  #printRoot .report-table td{ padding:5px 7px; border-bottom:1px solid #C9D0D8; vertical-align:top; word-break:normal; }
+  #printRoot .report-table tr:nth-child(even) td{ background:#F6F7F9 !important; }
+  #printRoot .card-eyebrow{ font-size:9pt; color:#333; margin:14px 0 5px; break-after:avoid; page-break-after:avoid; }
+  #printRoot .hint{ background:#F1F3F5; font-size:9.5pt; }
+  #printRoot .list-row{ border:1px solid #C9D0D8; break-inside:avoid; page-break-inside:avoid; padding:8px 10px; }
+  #printRoot .payroll-page{ border:none; padding:0; break-after:page; page-break-after:always; }
+  #printRoot .payroll-page:last-of-type{ break-after:auto; page-break-after:auto; }
+  #printRoot .scope-print-room{ break-inside:avoid; page-break-inside:avoid; }
+  #printRoot svg{ max-width:100%; }
+  #printRoot .print-footer{ margin-top:18px; padding-top:6px; border-top:1px solid #C9D0D8; font-size:8.5pt; color:#555E6B; text-align:center; }
+}
 @media print{
   header.top, .quote-box, .admin-footer, .overlay:not(.active){ display:none !important; }
   body{ background:#fff !important; padding-bottom:0 !important; }
@@ -352,6 +386,7 @@ main.content{padding:16px 14px 4px;}
 
   <main class="content">
     <div class="signed-in-banner" id="myUnresolvedBanner" style="display:none;background:var(--red);color:#fff;font-weight:700;"></div>
+    <div class="signed-in-banner" id="laborApprovalBanner" style="display:none;background:var(--gold);color:#1a1200;font-weight:700;cursor:pointer;margin-bottom:12px;" onclick="openLaborApproval()"></div>
     <div id="todayContent"></div>
     <div class="quote-box" id="quoteBox"></div>
     <div class="admin-footer" id="adminFooter"></div>
@@ -402,6 +437,7 @@ main.content{padding:16px 14px 4px;}
     <button class="close-x" onclick="closeModal('modalReportsHub')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div style="display:flex;flex-direction:column;gap:8px;">
+    <button class="btn btn-gold" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openLaborApproval()">Weekly labor approval (send to Job Tracker)</button>
     <button class="btn btn-gold" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openStaleShiftsReport()">⚠ Shift times needing review</button>
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openWhosOn()">Who's clocked in now</button>
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openDailyReport()">Daily hours report</button>
@@ -415,6 +451,19 @@ main.content{padding:16px 14px 4px;}
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openSignoffsReport()">Employee sign-offs</button>
     <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="closeModal('modalReportsHub');openLaborSyncLog()">Labor sync log (Job Tracker)</button>
   </div>
+</div></div>
+
+<!-- Weekly labor approval: review a finished week, then send it to Job Tracker -->
+<div class="overlay" id="modalLaborApproval"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title">Weekly labor approval</div><div class="sheet-sub">Review last week's hours, then send them to Job Tracker</div></div>
+    <div style="display:flex;align-items:center;gap:13px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button class="close-x" onclick="closeModal('modalLaborApproval')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
+  <div id="laborApprovalBody"></div>
 </div></div>
 
 <!-- Login PIN -->
@@ -431,15 +480,15 @@ main.content{padding:16px 14px 4px;}
     <div class="help-h"><span class="num">1</span>Signing in</div>
     <div class="help-step"><div class="n">1</div><div><div class="t">Enter the shared PIN</div><div class="d">Ask your supervisor if you don't have it. It only needs re-entering on a device if the PIN is ever changed.</div></div></div>
     <div class="help-step"><div class="n">2</div><div><div class="t">Tap your name</div><div class="d">Not listed yet? Type it in and tap Add.</div></div></div>
-    <div class="help-step"><div class="n">3</div><div><div class="t">Confirm "Yes, that's me"</div><div class="d">Double-check it's really your name before confirming — this is the easiest place to catch a mistake.</div></div></div>
+    <div class="help-step"><div class="n">3</div><div><div class="t">Confirm "Yes, that's me"</div><div class="d">Double-check it's really your name before confirming — this is the easiest place to catch a mistake. If you have admin access, you'll also enter your personal admin PIN.</div></div></div>
   </div>
 
   <div class="help-section">
     <div class="help-h"><span class="num">2</span>A normal work day</div>
-    <div class="help-p">Your day looks different depending on your job title (set by your manager in Manage Employees) — <b>Operations</b> or <b>Admin</b>.</div>
-    <div class="help-step"><div class="n">1</div><div><div class="t">Clock In</div><div class="d">Tap it the moment you start — this is what starts your paid time. If your job title is Admin, that's it — you're on the clock with nothing else to fill out, and a Clock Out button is waiting whenever your shift ends.</div></div></div>
+    <div class="help-p">Your day looks different depending on your role (set by your manager) — <b>Operations</b> or <b>Admin</b>.</div>
+    <div class="help-step"><div class="n">1</div><div><div class="t">Clock In</div><div class="d">Tap it the moment you start — this is what starts your paid time. If your role is Admin, that's it — you're on the clock with nothing else to fill out, and a Clock Out button is waiting whenever your shift ends.</div></div></div>
     <div class="help-step"><div class="n">2</div><div><div class="t">Pre-Trip (Operations only)</div><div class="d">Pick your vehicle, confirm the inspection, and confirm you've signed the paper sheet. No vehicle today? Choose "No Vehicle" to skip straight to the next step.</div></div></div>
-    <div class="help-step"><div class="n">3</div><div><div class="t">Log every job you head to (Operations only)</div><div class="d">Search the job by name and tap "I'm heading there." Not on a Mitigation job? Choose <b>Meeting</b>, <b>Cleanings</b>, or <b>Equipment Cleaning</b> from the top of the list, whichever fits. You can switch jobs as many times as you need during the day.</div></div></div>
+    <div class="help-step"><div class="n">3</div><div><div class="t">Log every job you head to (Operations only)</div><div class="d">Search the job by name and tap it, then confirm "Yes, I'm headed there" on the pop-up — that double-check keeps you from logging time to the wrong job. Not on a Mitigation job? Choose <b>Meeting</b>, <b>Cleanings</b>, or <b>Equipment Cleaning</b> from the top of the list, whichever fits. You can switch jobs as many times as you need during the day.</div></div></div>
     <div class="help-step"><div class="n">4</div><div><div class="t">Back to the shop (Operations only)</div><div class="d">Called back in later? The app offers "Clock Back In" — no need to redo your Pre-Trip.</div></div></div>
     <div class="help-step"><div class="n">5</div><div><div class="t">Post-Trip &amp; Clock Out (Operations only)</div><div class="d">Confirm the vehicle's clean and fueled, confirm your paper sheet, then Clock Out.</div></div></div>
   </div>
@@ -464,7 +513,7 @@ main.content{padding:16px 14px 4px;}
     <div class="help-h"><span class="num">1</span>Reports</div>
     <div class="help-p">Everything below lives under the Admin link at the bottom of the screen, inside Reports. What you see there depends on your permissions.</div>
     <div class="help-bullet">Who's clocked in right now</div>
-    <div class="help-bullet">Daily / Weekly / 2-week Payroll reports</div>
+    <div class="help-bullet">Daily / Weekly / Payroll reports — Weekly and Payroll let you pick the Biweekly or Weekly crew</div>
     <div class="help-bullet">Employee report — by name, any date range</div>
     <div class="help-bullet">Job report — everyone who worked a job, and a Send button to push hours to Job Tracker</div>
     <div class="help-bullet">Detailed labor report — per-day cost breakdown including overtime</div>
@@ -482,6 +531,9 @@ main.content{padding:16px 14px 4px;}
   <div class="help-section">
     <div class="help-h"><span class="num">3</span>Managing employees</div>
     <div class="help-bullet">Edit anyone's name, hourly rate, or permissions anytime</div>
+    <div class="help-bullet">Each person has one Role: <b>Operations: Weekly</b> (Fri&ndash;Thu weeks), <b>Operations: Bi-Weekly</b> (Mon&ndash;Sun weeks), or <b>Admin</b>. The role controls overtime, weekly totals, and which payroll report they appear on.</div>
+    <div class="help-bullet"><b>Admin</b> gets every report and tool, plus Weekly labor approval. Admins create a personal admin PIN at their next sign-in and must enter it to open the app. Use Reset PIN if someone forgets theirs.</div>
+    <div class="help-bullet">Operations people can be given optional extra-access boxes, or "Can log Printing." Anyone with an extra-access box also needs an admin PIN.</div>
     <div class="help-bullet">Archive instead of delete — hides them from sign-in but keeps their history intact</div>
     <div class="help-bullet">Restore an archived employee, or delete permanently if truly needed</div>
   </div>
@@ -491,7 +543,8 @@ main.content{padding:16px 14px 4px;}
     <div class="help-bullet">Add or remove vehicles from the Pre-Trip list</div>
     <div class="help-bullet">Manually add jobs that aren't pulled from Job Tracker</div>
     <div class="help-bullet">Job Tracker jobs drop off the list automatically 60 days after landing</div>
-    <div class="help-bullet">Hours send to Job Tracker automatically at clock-out, with overtime blended in — the Send button in the Job report is just a backup</div>
+    <div class="help-bullet">Hours go to Job Tracker <b>once a week</b>, after you approve them: Reports &rarr; Weekly labor approval. Each Monday the Biweekly crew's week is ready, and each Friday the Weekly crew's. You'll see a gold banner until it's done.</div>
+    <div class="help-bullet">Each job gets one line per employee for the week, with overtime blended in. If hours are fixed after a week was sent, that week comes back with just the difference as an adjustment.</div>
   </div>
 
   <div class="help-section">
@@ -524,7 +577,7 @@ main.content{padding:16px 14px 4px;}
     <div><div class="sheet-title">Manage employees</div><div class="sheet-sub">Who's on the sign-in list, and what they can access</div></div>
     <button class="close-x" onclick="cancelEmployeeEdits()"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
-  <div class="hint" style="margin-top:0;">Check a box to give that person a shortcut to that section, right on their own screen — no separate login. Leave everything unchecked and they'll never see it. Nothing here is permanent until you tap Save Changes.</div>
+  <div class="hint" style="margin-top:0;">Pick each person's <b>Role</b>. <b>Admin</b> gets every report and tool, approves the weekly hours sent to Job Tracker, and needs a personal admin PIN to sign in. <b>Operations</b> roles get the normal field workflow — Weekly (Fri&ndash;Thu) or Bi-Weekly (Mon&ndash;Sun). Nothing here is permanent until you tap Save Changes.</div>
   <div class="field">
     <label>Add an employee</label>
     <div style="display:flex;gap:8px;">
@@ -577,11 +630,17 @@ main.content{padding:16px 14px 4px;}
 <div class="overlay" id="modalWeeklyReport"><div class="sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-head">
-    <div><div class="sheet-title">Weekly hours</div><div class="sheet-sub">Monday&ndash;Sunday, every employee</div></div>
+    <div><div class="sheet-title">Weekly hours</div><div class="sheet-sub">One week, by pay schedule</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModal('modalWeeklyReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
+  </div>
+  <div class="field"><label>Pay schedule</label>
+    <select id="weeklyReportSchedule" onchange="renderWeeklyReport()">
+      <option value="biweekly">Biweekly crew (Mon&ndash;Sun weeks)</option>
+      <option value="weekly">Weekly crew (Fri&ndash;Thu weeks)</option>
+    </select>
   </div>
   <div class="field"><label>Any day in the week</label><input type="date" id="weeklyReportDate" onchange="renderWeeklyReport()"></div>
   <div id="weeklyReportSummary" class="hint" style="margin-top:0;"></div>
@@ -592,13 +651,19 @@ main.content{padding:16px 14px 4px;}
 <div class="overlay" id="modalPayrollReport"><div class="sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-head">
-    <div><div class="sheet-title">Payroll report</div><div class="sheet-sub">2-week period, one page per employee</div></div>
+    <div><div class="sheet-title">Payroll report</div><div class="sheet-sub">One page per employee, by pay schedule</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModal('modalPayrollReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
-  <div class="field"><label>Pay period start (a Monday)</label><input type="date" id="payrollStartDate" onchange="renderPayrollReport()"></div>
+  <div class="field"><label>Pay schedule</label>
+    <select id="payrollSchedule" onchange="onPayrollScheduleChange()">
+      <option value="biweekly">Biweekly crew (2 weeks, Mon&ndash;Sun)</option>
+      <option value="weekly">Weekly crew (1 week, Fri&ndash;Thu)</option>
+    </select>
+  </div>
+  <div class="field"><label>Pay period start</label><input type="date" id="payrollStartDate" onchange="renderPayrollReport()"></div>
   <div id="payrollReportBody"></div>
 </div></div>
 
@@ -667,7 +732,10 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Edit history</div><div class="sheet-sub">Every change made through Adjust Time Entries</div></div>
-    <button class="close-x" onclick="closeModal('modalAuditLog')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <div style="display:flex;align-items:center;gap:13px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button class="close-x" onclick="closeModal('modalAuditLog')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
   </div>
   <div style="display:flex;gap:8px;">
     <div class="field" style="flex:1;"><label>From</label><input type="date" id="auditLogFrom" onchange="renderAuditLog()"></div>
@@ -681,7 +749,10 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Shift times needing review</div><div class="sheet-sub">A missing clock-out, or a clock-in/out that doesn't add up</div></div>
-    <button class="close-x" onclick="closeModal('modalStaleShifts')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <div style="display:flex;align-items:center;gap:13px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button class="close-x" onclick="closeModal('modalStaleShifts')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
   </div>
   <div id="staleShiftsBody"></div>
 </div></div>
@@ -691,7 +762,10 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-handle"></div>
   <div class="sheet-head">
     <div><div class="sheet-title">Employee sign-offs</div><div class="sheet-sub">Who has certified their hours, and when</div></div>
-    <button class="close-x" onclick="closeModal('modalSignoffsReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <div style="display:flex;align-items:center;gap:13px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button class="close-x" onclick="closeModal('modalSignoffsReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
   </div>
   <div id="signoffsReportBody"></div>
 </div></div>
@@ -759,6 +833,7 @@ main.content{padding:16px 14px 4px;}
   <div class="hint" style="text-align:center;">Tap any day you worked to see the job-by-job breakdown.</div>
   <div style="height:1px;background:var(--line);margin:14px 0;"></div>
   <div class="card-eyebrow">Certify a date range</div>
+  <div class="hint" id="myPaySchedule" style="margin-top:4px;"></div>
   <div style="display:flex;gap:8px;">
     <div class="field" style="flex:1;"><label>From</label><input type="date" id="mySignoffFrom" onchange="renderMySignoff()"></div>
     <div class="field" style="flex:1;"><label>To</label><input type="date" id="mySignoffTo" onchange="renderMySignoff()"></div>
@@ -816,6 +891,18 @@ main.content{padding:16px 14px 4px;}
   <div id="adjustTimesBody"></div>
 </div></div>
 
+<!-- "Are you headed to ___?" confirmation before any job is logged -->
+<div class="overlay" id="modalConfirmJob" style="align-items:center;padding:16px;"><div class="sheet" style="border-radius:20px;max-width:400px;text-align:center;padding:26px 20px 22px;">
+  <div class="card-eyebrow">Confirm your job</div>
+  <div style="font-size:14px;color:var(--muted);margin-top:8px;">You are headed to</div>
+  <div id="confirmJobName" style="font-size:24px;font-weight:800;color:var(--ink);margin:6px 0 22px;line-height:1.25;word-break:break-word;"></div>
+  <button class="btn btn-gold" onclick="confirmStartJob()">Yes, I'm headed there</button>
+  <button class="btn btn-ghost" style="margin-top:10px;" onclick="cancelStartJob()">No, go back</button>
+</div></div>
+
+<!-- Print-only copy of whatever report is being printed (see printReportContent) -->
+<div id="printRoot"></div>
+
 <div class="toast" id="toast" onclick="document.getElementById('toast').classList.remove('show')" style="cursor:pointer;" title="Tap to dismiss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span id="toastMsg"></span></div>
 
 <script>
@@ -828,7 +915,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-09-30T22-10";
+const BUILD_ID = "2026-10-05T23-40";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -988,7 +1075,7 @@ function boot(){
 function proceedPastPin(){
   const saved = localStorage.getItem(EMP_STORAGE_KEY);
   if(saved && employees.some(e=>e.name===saved && !e.archived)){
-    selectEmployee(saved, true);
+    beginSignIn(saved);
   } else {
     showEmployeePicker();
   }
@@ -1029,13 +1116,129 @@ function showEmployeePicker(){
 // A deliberate, hard-to-miss step between picking a name and actually being
 // signed in — catches the very common "tapped the wrong name in a list"
 // mistake before it ever reaches the timesheet.
+/* ---- Personal admin PINs ----
+   The shared PIN gets everyone into the app. On top of that, anyone with
+   at least one admin permission checked (Reports, Adjust times, Employees,
+   Vehicles, Job list) must also enter their OWN PIN to sign in as
+   themselves — so a tech can't tap an admin's name and see payroll.
+   Only a scrambled (hashed) version of each PIN is stored, never the PIN
+   itself. A device remembers a correct PIN until that PIN is changed or
+   reset, or someone taps "Switch employee." */
+const ADMIN_VERIFIED_KEY = 'vodaTimeTrackerAdminVerified';
+/* ---- Roles ----
+   Each person has one Role in Manage Employees:
+     Operations: Weekly    — Fri–Thu weeks, normal field workflow
+     Operations: Bi-Weekly — Mon–Sun weeks, normal field workflow
+     Admin                 — Mon–Sun weeks, simple clock in/out, and full
+                             access to every report, tool, and the weekly
+                             Job Tracker approval. Always needs their
+                             personal admin PIN to sign in.
+   Under the hood this is still jobTitle ('Operations' / 'Admin') plus
+   paySchedule, so older saved data keeps working. Operations people can
+   still be given individual extra-access boxes if ever needed. */
+const ALL_PERMS = { vehicles:true, jobs:true, employees:true, reports:true, adjustTimes:true };
+function isAdminRole(emp){ return !!(emp && emp.jobTitle==='Admin'); }
+function effectivePerms(emp){
+  if(isAdminRole(emp)) return { ...ALL_PERMS };
+  return (emp && emp.perms) || {vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false};
+}
+function employeeRole(emp){
+  if(isAdminRole(emp)) return 'admin';
+  return (emp && emp.paySchedule==='weekly') ? 'ops-weekly' : 'ops-biweekly';
+}
+function canLogPrinting(emp){ return !!(emp && (emp.canPrint || emp.jobTitle==='Print & Ops')); }
+function hasAnyPerm(emp){
+  const p = effectivePerms(emp);
+  return !!(p.vehicles || p.jobs || p.employees || p.reports || p.adjustTimes);
+}
+async function hashPin(pin){
+  const data = new TextEncoder().encode('voda-time-tracker|' + pin);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function adminVerifiedOnDevice(name){
+  const emp = employees.find(e=>e.name===name);
+  if(!emp || !emp.adminPinHash) return false;
+  return localStorage.getItem(ADMIN_VERIFIED_KEY) === name + '|' + emp.adminPinHash;
+}
+function markAdminVerified(name, hash){
+  localStorage.setItem(ADMIN_VERIFIED_KEY, name + '|' + hash);
+}
+// Every way into the app as a specific person goes through here.
+function beginSignIn(name){
+  const emp = employees.find(e=>e.name===name);
+  if(!hasAnyPerm(emp) || adminVerifiedOnDevice(name)){ selectEmployee(name); return; }
+  if(emp.adminPinHash) showAdminPinGate(name); else showCreateAdminPin(name);
+}
+function adminGateShell(inner){
+  document.getElementById('authGate').style.display = 'flex';
+  const logoImg = `<img class="gate-logo" src="${headerLogoSrc()}" alt="Voda">`;
+  document.getElementById('authGateBox').innerHTML = logoImg + inner;
+  setTimeout(()=>{ const el = document.querySelector('#authGateBox input'); if(el) el.focus(); }, 60);
+}
+const ADMIN_PIN_INPUT_STYLE = 'text-align:center;font-size:22px;letter-spacing:8px;border:1.5px solid var(--line);border-radius:10px;padding:12px;width:100%;box-sizing:border-box;margin-bottom:12px;';
+function showAdminPinGate(name){
+  const js = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  adminGateShell(`<h2>Admin PIN</h2><p>${escapeHtml(name)} has admin access. Enter your personal admin PIN to continue.</p>
+    <input id="adminPinInput" type="password" inputmode="numeric" placeholder="\u2022\u2022\u2022\u2022" style="${ADMIN_PIN_INPUT_STYLE}" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmAdminPin('${js}');}">
+    <button class="btn btn-gold" style="margin-bottom:10px;" onclick="confirmAdminPin('${js}')">Continue</button>
+    <button class="btn btn-ghost" onclick="cancelAdminPin()">Not me \u2014 go back</button>
+    <p style="font-size:11.5px;margin-top:14px;margin-bottom:0;">Forgot it? Someone with Employees access can reset it in Manage Employees.</p>`);
+}
+function showCreateAdminPin(name){
+  const js = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  adminGateShell(`<h2>Create your admin PIN</h2><p>${escapeHtml(name)} has admin access, so you need a personal PIN only you know. Use at least 4 digits, and don't reuse the shared PIN.</p>
+    <input id="newAdminPin1" type="password" inputmode="numeric" placeholder="New PIN" style="${ADMIN_PIN_INPUT_STYLE}">
+    <input id="newAdminPin2" type="password" inputmode="numeric" placeholder="Type it again" style="${ADMIN_PIN_INPUT_STYLE}" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmCreateAdminPin('${js}');}">
+    <button class="btn btn-gold" style="margin-bottom:10px;" onclick="confirmCreateAdminPin('${js}')">Save PIN</button>
+    <button class="btn btn-ghost" onclick="cancelAdminPin()">Not me \u2014 go back</button>`);
+}
+function cancelAdminPin(){
+  localStorage.removeItem(EMP_STORAGE_KEY);
+  if(currentUser){ location.reload(); return; } // was already in the app (e.g. opening Admin) — start clean
+  showEmployeePicker();
+}
+async function confirmAdminPin(name){
+  const input = document.getElementById('adminPinInput');
+  const pin = input.value.trim();
+  const emp = employees.find(e=>e.name===name);
+  if(!emp || !pin) return;
+  const h = await hashPin(pin);
+  if(h !== emp.adminPinHash){ showToast('Incorrect admin PIN'); input.value=''; return; }
+  markAdminVerified(name, h);
+  finishAdminGate(name);
+}
+async function confirmCreateAdminPin(name){
+  const p1 = document.getElementById('newAdminPin1').value.trim();
+  const p2 = document.getElementById('newAdminPin2').value.trim();
+  if(!/^\d{4,}$/.test(p1)){ showToast('Use at least 4 digits'); return; }
+  if(p1 !== p2){ showToast("The two PINs don't match"); document.getElementById('newAdminPin2').value=''; return; }
+  if(p1 === (settings.loginPin || DEFAULT_LOGIN_PIN)){ showToast("Pick something different from the shared PIN"); return; }
+  const emp = employees.find(e=>e.name===name);
+  if(!emp) return;
+  const h = await hashPin(p1);
+  emp.adminPinHash = h;
+  const ok = await saveEmployees();
+  if(!ok){ emp.adminPinHash = ''; return; }
+  markAdminVerified(name, h);
+  showToast('Admin PIN saved');
+  finishAdminGate(name);
+}
+function finishAdminGate(name){
+  if(currentUser && currentUser.name===name){
+    document.getElementById('authGate').style.display = 'none';
+    openAdminMenu();
+  } else {
+    selectEmployee(name);
+  }
+}
 function confirmSignIn(name){
   const box = document.getElementById('authGateBox');
   const logoImg = `<img class="gate-logo" src="${headerLogoSrc()}" alt="Voda">`;
   box.innerHTML = `${logoImg}
     <p style="font-size:13px;color:var(--muted);margin-bottom:6px;">You are signing in as</p>
     <h2 style="font-size:30px;margin-bottom:24px;">${escapeHtml(name)}</h2>
-    <button class="btn btn-gold" style="margin-bottom:10px;" onclick="selectEmployee('${name.replace(/'/g,"\\'")}')">Yes, that's me</button>
+    <button class="btn btn-gold" style="margin-bottom:10px;" onclick="beginSignIn('${name.replace(/'/g,"\\'")}')">Yes, that's me</button>
     <button class="btn btn-ghost" onclick="showEmployeePicker()">Not me — go back</button>`;
 }
 async function confirmAddEmployeeSelf(){
@@ -1043,7 +1246,7 @@ async function confirmAddEmployeeSelf(){
   const name = input.value.trim();
   if(!name){ showToast('Enter your name'); return; }
   if(!employees.some(e=>e.name.toLowerCase()===name.toLowerCase())){
-    employees.push({ name, hourlyRate:0, perms:{vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false} });
+    employees.push({ name, hourlyRate:0, jobTitle:'Operations', paySchedule:'biweekly', perms:{vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false} });
     await saveEmployees();
   }
   confirmSignIn(name);
@@ -1065,6 +1268,7 @@ function selectEmployee(name, skipLoad){
   renderToday();
   renderAdminFooter();
   checkMyOwnUnresolvedEntries();
+  checkLaborApprovalPrompt(true);
   if(!tickHandle) tickHandle = setInterval(refreshDataFromServer, 30000);
 }
 // Pulls fresh entries/employees/settings from the backend without disrupting
@@ -1094,7 +1298,12 @@ async function refreshDataFromServer(){
     // it had just fetched before that save had fully landed).
     if(todayEntry){
       const fresh = entries.find(e=>e.id===todayEntry.id);
-      if(fresh && (!todayEntry.updatedAt || !fresh.updatedAt || fresh.updatedAt >= todayEntry.updatedAt)){
+      if(fresh && fresh.date !== todayEntry.date){
+        // An admin moved this entry to another date (backdating a fix) —
+        // don't keep showing it as today's entry on this employee's phone.
+        todayEntry = null;
+        findTodayEntry();
+      } else if(fresh && (!todayEntry.updatedAt || !fresh.updatedAt || fresh.updatedAt >= todayEntry.updatedAt)){
         todayEntry = fresh;
       }
     }
@@ -1117,18 +1326,19 @@ async function refreshDataFromServer(){
   renderToday();
   renderAdminFooter();
   checkMyOwnUnresolvedEntries();
+  checkLaborApprovalPrompt(false);
 }
 function switchEmployee(){
   if(!confirm(`Switch off ${currentUser?currentUser.name:'this account'}?`)) return;
   localStorage.removeItem(EMP_STORAGE_KEY);
+  localStorage.removeItem(ADMIN_VERIFIED_KEY);
   location.reload();
 }
 // The small footer row: a single "Admin" link that only appears at all if
 // this signed-in person has been checked for at least one category in
 // Manage Employees. Nothing to see, nothing to tap, if they have none.
 function currentPerms(){
-  const emp = employees.find(e=>e.name===currentUser.name);
-  return (emp && emp.perms) || {vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false};
+  return effectivePerms(employees.find(e=>e.name===currentUser.name));
 }
 function renderAdminFooter(){
   const wrap = document.getElementById('adminFooter');
@@ -1167,7 +1377,7 @@ function checkMyOwnUnresolvedEntries(){
 /* ============ MANAGE EMPLOYEES (draft + explicit Save/Cancel) ============ */
 let employeesDraft = null;
 function openManageEmployees(){
-  employeesDraft = employees.map(e=>({ name:e.name, _origName:e.name, hourlyRate:e.hourlyRate||0, jobTitle:e.jobTitle||'Operations', archived:!!e.archived, perms:{...e.perms} }));
+  employeesDraft = employees.map(e=>({ name:e.name, _origName:e.name, hourlyRate:e.hourlyRate||0, jobTitle:e.jobTitle==='Admin'?'Admin':'Operations', paySchedule:(e.jobTitle!=='Admin' && e.paySchedule==='weekly')?'weekly':'biweekly', canPrint:canLogPrinting(e), adminPinHash:e.adminPinHash||'', archived:!!e.archived, perms:{...e.perms} }));
   renderEmployeeList();
   document.getElementById('employeeNameInput').value = '';
   openModal('modalEmployees');
@@ -1179,33 +1389,42 @@ function renderEmployeeList(){
   const rowHtml = (emp) => {
     const p = emp.perms || {};
     const key = escapeHtml(emp._origName).replace(/'/g,"\\'");
-    const jt = emp.jobTitle || 'Operations';
+    const role = employeeRole(emp);
+    const roleDesc = role==='admin'
+      ? 'Simple clock in/out. Full access to every report and tool, and approves the weekly hours sent to Job Tracker. Needs a personal admin PIN to sign in.'
+      : (role==='ops-weekly' ? 'Field workflow (vehicle, jobs, Pre/Post-Trip). Fri&ndash;Thu weeks, paid every week.' : 'Field workflow (vehicle, jobs, Pre/Post-Trip). Mon&ndash;Sun weeks, paid every two weeks.');
     return `<div class="list-row" style="flex-direction:column;align-items:stretch;gap:9px;">
       <div style="display:flex;align-items:center;gap:8px;">
         <input value="${escapeHtml(emp.name)}" style="flex:1;font-weight:700;padding:7px 9px;border:1.5px solid var(--line);border-radius:8px;" onchange="setDraftName('${key}',this.value)">
         <button class="del-btn" title="Archive" onclick="archiveEmployeeDraft('${key}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg></button>
       </div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
-        <span>Job title</span>
-        <select style="padding:5px 7px;border:1.5px solid var(--line);border-radius:7px;font-size:12px;font-weight:700;color:var(--ink);" onchange="setDraftJobTitle('${key}',this.value)">
-          <option value="Operations" ${jt==='Operations'?'selected':''}>Operations</option>
-          <option value="Print & Ops" ${jt==='Print & Ops'?'selected':''}>Print & Ops</option>
-          <option value="Admin" ${jt==='Admin'?'selected':''}>Admin</option>
+        <span>Role</span>
+        <select style="padding:6px 8px;border:1.5px solid var(--line);border-radius:7px;font-size:12.5px;font-weight:700;color:var(--ink);" onchange="setDraftRole('${key}',this.value)">
+          <option value="ops-weekly" ${role==='ops-weekly'?'selected':''}>Operations: Weekly</option>
+          <option value="ops-biweekly" ${role==='ops-biweekly'?'selected':''}>Operations: Bi-Weekly</option>
+          <option value="admin" ${role==='admin'?'selected':''}>Admin</option>
         </select>
-        <span style="color:var(--muted);">${jt==='Admin' ? '— simple clock in/out only' : (jt==='Print & Ops' ? '— vehicle, jobs, Pre/Post-Trip, plus Printing' : '— vehicle, jobs, Pre/Post-Trip')}</span>
       </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:-4px;">${roleDesc}</div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
         <span>Hourly rate $</span>
         <input type="number" min="0" step="0.01" value="${emp.hourlyRate||''}" placeholder="0.00" style="width:80px;padding:5px 7px;border:1.5px solid var(--line);border-radius:7px;font-size:12px;" onchange="setDraftRate('${key}',this.value)">
         <span style="color:var(--muted);">— used when sending hours to Job Tracker</span>
       </div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);">
+      ${role==='admin' ? '' : `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--muted);"><input type="checkbox" ${emp.canPrint?'checked':''} onchange="setDraftCanPrint('${key}',this.checked)"> Can log <b style="color:var(--ink);">Printing</b> as a job</label>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:-4px;">Extra access (optional)</div>`}
+      <div style="display:${role==='admin'?'none':'flex'};gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);">
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.vehicles?'checked':''} onchange="setDraftPermission('${key}','vehicles',this.checked)"> Vehicles</label>
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.jobs?'checked':''} onchange="setDraftPermission('${key}','jobs',this.checked)"> Job list</label>
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.employees?'checked':''} onchange="setDraftPermission('${key}','employees',this.checked)"> Employees</label>
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.reports?'checked':''} onchange="setDraftPermission('${key}','reports',this.checked)"> Reports</label>
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${p.adjustTimes?'checked':''} onchange="setDraftPermission('${key}','adjustTimes',this.checked)"> Adjust times</label>
       </div>
+      ${hasAnyPerm(emp) ? `<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);">
+        <span>Admin PIN: <b style="color:var(--ink);">${emp.adminPinHash ? 'Set' : 'Not set yet \u2014 they\'ll create one at their next sign-in'}</b></span>
+        ${emp.adminPinHash ? `<button class="chip-sm" style="cursor:pointer;" onclick="resetDraftAdminPin('${key}')">Reset PIN</button>` : ''}
+      </div>` : ''}
     </div>`;
   };
   let html = active.length ? active.map(rowHtml).join('') : `<div class="empty">No active employees.</div>`;
@@ -1229,6 +1448,30 @@ function setDraftName(origName, val){
   if(!emp) return;
   emp.name = val;
 }
+function setDraftRole(origName, val){
+  const emp = employeesDraft.find(e=>e._origName===origName);
+  if(!emp) return;
+  if(val==='admin'){ emp.jobTitle = 'Admin'; emp.paySchedule = 'biweekly'; }
+  else { emp.jobTitle = 'Operations'; emp.paySchedule = val==='ops-weekly' ? 'weekly' : 'biweekly'; }
+  renderEmployeeList();
+}
+function setDraftCanPrint(origName, val){
+  const emp = employeesDraft.find(e=>e._origName===origName);
+  if(!emp) return;
+  emp.canPrint = !!val;
+}
+function setDraftPaySchedule(origName, val){
+  const emp = employeesDraft.find(e=>e._origName===origName);
+  if(!emp) return;
+  emp.paySchedule = val==='weekly' ? 'weekly' : 'biweekly';
+}
+function resetDraftAdminPin(origName){
+  const emp = employeesDraft.find(e=>e._origName===origName);
+  if(!emp) return;
+  if(!confirm(`Reset ${emp.name}'s admin PIN? They'll be asked to create a new one the next time they sign in. Takes effect when you tap Save Changes.`)) return;
+  emp.adminPinHash = '';
+  renderEmployeeList();
+}
 function setDraftJobTitle(origName, val){
   const emp = employeesDraft.find(e=>e._origName===origName);
   if(!emp) return;
@@ -1244,13 +1487,14 @@ function setDraftPermission(origName, key, val){
   if(!emp) return;
   if(!emp.perms) emp.perms = {vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false};
   emp.perms[key] = val;
+  renderEmployeeList();
 }
 function confirmAddEmployee(){
   const input = document.getElementById('employeeNameInput');
   const name = input.value.trim();
   if(!name){ showToast('Enter a name'); return; }
   if(employeesDraft.some(e=>e.name.toLowerCase()===name.toLowerCase())){ showToast('Already on the list'); input.value=''; return; }
-  employeesDraft.push({ name, _origName:name, hourlyRate:0, jobTitle:'Operations', archived:false, perms:{vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false} });
+  employeesDraft.push({ name, _origName:name, hourlyRate:0, jobTitle:'Operations', paySchedule:'biweekly', canPrint:false, adminPinHash:'', archived:false, perms:{vehicles:false,jobs:false,employees:false,reports:false,adjustTimes:false} });
   input.value='';
   renderEmployeeList();
 }
@@ -1294,7 +1538,12 @@ async function saveEmployeeEdits(){
       entries.forEach(en=>{ if(en.employeeName===e._origName){ en.employeeName = newName; renamedEntries.push(en); } });
     }
   });
-  const draftCopy = employeesDraft.map(e=>({ name:e.name.trim(), hourlyRate:e.hourlyRate||0, jobTitle:e.jobTitle||'Operations', archived:!!e.archived, perms:{...e.perms} }));
+  const draftCopy = employeesDraft.map(e=>{
+    const copy = { name:e.name.trim(), hourlyRate:e.hourlyRate||0, jobTitle:e.jobTitle==='Admin'?'Admin':'Operations', paySchedule:(e.jobTitle!=='Admin' && e.paySchedule==='weekly')?'weekly':'biweekly', archived:!!e.archived, perms:{...e.perms} };
+    if(e.canPrint) copy.canPrint = true;
+    if(e.adminPinHash) copy.adminPinHash = e.adminPinHash;
+    return copy;
+  });
   employeesDraft = null;
   employees = draftCopy;
   const ok = await saveEmployees();
@@ -1305,6 +1554,11 @@ async function saveEmployeeEdits(){
 
 /* ============ TEAM TOOLS MENU (per-employee permissions, no PIN) ============ */
 function openAdminMenu(){
+  if(!adminVerifiedOnDevice(currentUser.name)){
+    const emp = employees.find(e=>e.name===currentUser.name);
+    if(emp && emp.adminPinHash) showAdminPinGate(currentUser.name); else showCreateAdminPin(currentUser.name);
+    return;
+  }
   const p = currentPerms();
   document.getElementById('adminAsLabel').textContent = `Signed in as ${currentUser.name}`;
   const items = [];
@@ -1455,12 +1709,251 @@ async function pushLaborCostToJobTracker(jobId, employeeName, amount, note){
 // history. On any failure a session is simply left as-is; it still shows a
 // Send button in the Job Report as a fallback, so nothing is ever silently
 // lost.
+/* ============ WEEKLY LABOR APPROVAL ============
+   Hours used to go to Job Tracker every time someone clocked out, which
+   filled each job with one small line per person per day. Now nothing is
+   sent until a finished week is reviewed and approved:
+     - Monday: the Biweekly crew's Mon–Sun week that just ended
+     - Friday: the Weekly crew's Fri–Thu week that just ended
+   Approving sends ONE line per employee per job for that week (hours and
+   dollars, overtime blended in), all in a single update to Job Tracker.
+   "Pending" is worked out from each job log's own sent amount, so if hours
+   are corrected after a week was approved, that week shows up again with
+   just the difference as an adjustment line. Nothing extra is stored. */
+const LABOR_APPROVAL_LOOKBACK_WEEKS = 6;
+let laborApprovalSelected = null; // { sched, weekStart }
+let laborApprovalSending = false;
+function canApproveLabor(){
+  return !!(currentUser && currentPerms().reports);
+}
+// Everything about one crew's week: totals, what's owed to each job, and
+// whether anything needs fixing first.
+function buildLaborWeek(sched, weekStart){
+  const weekEnd = addDays(weekStart, 6);
+  const weekEntries = entries.filter(e=>e.date>=weekStart && e.date<=weekEnd && paySchedule(e.employeeName)===sched);
+  const employeeTotals = {}; // name -> { ms, flagged }
+  const groups = {};          // jobId|name -> line
+  weekEntries.forEach(e=>{
+    const name = e.employeeName;
+    if(!employeeTotals[name]) employeeTotals[name] = { ms:0, flagged:false, flaggedDates:[] };
+    employeeTotals[name].ms += entryHoursMsForReport(e);
+    if(entryNeedsHoursReview(e)){ employeeTotals[name].flagged = true; employeeTotals[name].flaggedDates.push(e.date); }
+    const emp = employees.find(x=>x.name===name);
+    const baseRate = emp ? (emp.hourlyRate||0) : 0;
+    const rate = weekEffectiveRate(name, weekStart, baseRate);
+    e.jobLogs.forEach(jl=>{
+      if(!jl.jobId || !jl.endedAt) return;
+      const ms = new Date(jl.endedAt) - new Date(jl.startedAt);
+      const correct = Math.round((ms/3600000)*rate*100)/100;
+      const owed = Math.round((correct - (jl.syncedAmount||0))*100)/100;
+      const pending = !jl.syncedToJobTracker || Math.abs(owed) >= 0.01;
+      const key = jl.jobId + '|' + name;
+      if(!groups[key]) groups[key] = { jobId:jl.jobId, jobName:jl.jobName, name, ms:0, amount:0, pending:false, hadPrior:false, logs:[] };
+      const g = groups[key];
+      g.ms += ms;
+      if(pending){
+        g.pending = true;
+        g.amount = Math.round((g.amount + owed)*100)/100;
+        if(jl.syncedToJobTracker) g.hadPrior = true;
+        g.logs.push({ entryId:e.id, logId:jl.id, correct });
+      }
+    });
+  });
+  const lines = Object.values(groups).filter(g=>g.pending).sort((a,b)=>a.jobName.localeCompare(b.jobName) || a.name.localeCompare(b.name));
+  const flagged = Object.keys(employeeTotals).filter(n=>employeeTotals[n].flagged);
+  return { sched, weekStart, weekEnd, employeeTotals, lines, flagged };
+}
+function pendingLaborWeeks(){
+  const out = [];
+  ['biweekly','weekly'].forEach(sched=>{
+    const lastFinished = addDays(weekStartForSchedule(sched, todayStr()), -7);
+    for(let k=0; k<LABOR_APPROVAL_LOOKBACK_WEEKS; k++){
+      const ws = addDays(lastFinished, -7*k);
+      const wk = buildLaborWeek(sched, ws);
+      if(wk.lines.length) out.push(wk);
+    }
+  });
+  return out.sort((a,b)=>a.weekStart.localeCompare(b.weekStart));
+}
+// Gold banner whenever a finished week is waiting, plus the review screen
+// opening on its own once a day (on sign-in) so it can't be missed.
+function checkLaborApprovalPrompt(allowAutoOpen){
+  const el = document.getElementById('laborApprovalBanner');
+  if(!el) return;
+  if(!canApproveLabor()){ el.style.display = 'none'; return; }
+  const pending = pendingLaborWeeks();
+  if(!pending.length){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = pending.length===1
+    ? `${pending[0].sched==='weekly'?'Weekly':'Biweekly'} crew hours for ${fmtDateShort(pending[0].weekStart)} \u2013 ${fmtDateShort(pending[0].weekEnd)} are ready to review and send to Job Tracker \u2192`
+    : `${pending.length} weeks of hours are ready to review and send to Job Tracker \u2192`;
+  const key = 'vodaLaborPromptShown_' + currentUser.name;
+  if(allowAutoOpen && localStorage.getItem(key) !== todayStr()){
+    localStorage.setItem(key, todayStr());
+    openLaborApproval();
+  }
+}
+function openLaborApproval(){
+  if(!canApproveLabor()){ showToast('You need the Reports permission for this'); return; }
+  laborApprovalSelected = null;
+  renderLaborApproval();
+  if(!document.getElementById('modalLaborApproval').classList.contains('active')) openModal('modalLaborApproval');
+}
+function selectLaborWeek(sched, weekStart){
+  laborApprovalSelected = { sched, weekStart };
+  renderLaborApproval();
+}
+function renderLaborApproval(){
+  const wrap = document.getElementById('laborApprovalBody');
+  if(!wrap) return;
+  if(!laborApprovalSelected){
+    const pending = pendingLaborWeeks();
+    if(!pending.length){
+      wrap.innerHTML = `<div class="empty">All caught up \u2014 every finished week has been sent to Job Tracker.</div>
+        <div class="hint">The Biweekly crew's week is ready each Monday, and the Weekly crew's week each Friday.</div>`;
+      return;
+    }
+    wrap.innerHTML = `<div class="hint" style="margin-top:0;">Pick a week to review. Nothing is sent until you approve it.</div>` +
+      pending.map(w=>{
+        const total = w.lines.reduce((s,l)=>s+l.amount,0);
+        return `<div class="list-row" style="cursor:pointer;" onclick="selectLaborWeek('${w.sched}','${w.weekStart}')">
+          <div>
+            <div class="nm">${w.sched==='weekly'?'Weekly':'Biweekly'} crew \u2014 ${fmtDateShort(w.weekStart)} \u2013 ${fmtDateShort(w.weekEnd)}</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">${w.lines.length} line${w.lines.length===1?'':'s'} to send \u00b7 $${total.toFixed(2)}${w.flagged.length?` \u00b7 <span style="color:var(--red);font-weight:700;">\u26a0 ${w.flagged.length} need${w.flagged.length===1?'s':''} fixing</span>`:''}</div>
+          </div>
+          <span style="color:var(--muted);font-size:18px;">\u203a</span>
+        </div>`;
+      }).join('');
+    return;
+  }
+  const { sched, weekStart } = laborApprovalSelected;
+  const w = buildLaborWeek(sched, weekStart);
+  const crewLabel = sched==='weekly' ? 'Weekly' : 'Biweekly';
+  const letterhead = reportLetterheadHtml(`Weekly Labor Approval &mdash; ${crewLabel} Crew, ${fmtDateShort(w.weekStart)} \u2013 ${fmtDateShort(w.weekEnd)}`);
+  const names = Object.keys(w.employeeTotals).sort((a,b)=>a.localeCompare(b));
+  const totalsRows = names.map(n=>{
+    const t = w.employeeTotals[n];
+    const hrs = t.ms/3600000;
+    const ot = Math.max(0, hrs-40);
+    const fix = t.flagged ? t.flaggedDates.map(d=>`<a href="#" style="color:var(--red);font-weight:700;" onclick="event.preventDefault();openAdjustTimesFor('${n.replace(/'/g,"\\'")}','${d}')">\u26a0 Fix ${fmtDateShort(d)}</a>`).join(' ') : '';
+    return `<tr><td>${escapeHtml(n)}</td><td>${fmtDuration(t.ms)}</td><td>${ot>0 ? fmtDuration(ot*3600000) : '\u2014'}</td><td>${fix}</td></tr>`;
+  }).join('');
+  let jobsHtml = '';
+  let lastJob = null, grand = 0;
+  w.lines.forEach(l=>{
+    if(l.jobName!==lastJob){
+      if(lastJob!==null) jobsHtml += `</tbody></table>`;
+      jobsHtml += `<div class="card-eyebrow" style="margin-top:12px;">${escapeHtml(l.jobName)}</div>
+        <table class="report-table"><thead><tr><th>Employee</th><th>Hours this week</th><th>To send</th></tr></thead><tbody>`;
+      lastJob = l.jobName;
+    }
+    grand += l.amount;
+    jobsHtml += `<tr><td>${escapeHtml(l.name)}</td><td>${fmtDuration(l.ms)}</td><td>$${l.amount.toFixed(2)}${l.hadPrior ? ' <span style="color:var(--muted);">(adjustment)</span>' : ''}</td></tr>`;
+  });
+  if(lastJob!==null) jobsHtml += `</tbody></table>`;
+  const blocked = w.flagged.length > 0;
+  wrap.innerHTML = `
+    <button class="btn btn-ghost" style="width:auto;padding:8px 14px;margin-bottom:10px;" onclick="laborApprovalSelected=null;renderLaborApproval()">\u2190 All pending weeks</button>
+    ${letterhead}
+    <div class="card-eyebrow">Employee totals</div>
+    ${names.length ? `<table class="report-table"><thead><tr><th>Employee</th><th>Total hours</th><th>Over 40</th><th></th></tr></thead><tbody>${totalsRows}</tbody></table>` : `<div class="empty">No hours logged this week.</div>`}
+    <div class="card-eyebrow" style="margin-top:16px;">Going to Job Tracker (one line per employee per job)</div>
+    ${jobsHtml || '<div class="empty">Nothing to send for this week.</div>'}
+    <div class="hint" style="margin-top:12px;font-weight:700;color:var(--ink);">Total to send: $${grand.toFixed(2)}</div>
+    <div class="hint">Shop time, meetings, and anything not tied to a Job Tracker job is counted in the totals above but isn't sent to a job. Employees with no hourly rate set send $0.</div>
+    ${blocked
+      ? `<div class="hint" style="color:var(--red);font-weight:700;">\u26a0 ${w.flagged.map(escapeHtml).join(', ')} ${w.flagged.length===1?'has':'have'} a missing or impossible clock time this week. Fix ${w.flagged.length===1?'it':'them'} above before approving \u2014 otherwise those hours would be left out.</div>
+         <button class="btn btn-ghost" disabled style="opacity:.55;">Approve &amp; send to Job Tracker</button>`
+      : `<button class="btn btn-gold" onclick="approveLaborWeek('${sched}','${weekStart}')">Approve &amp; send to Job Tracker</button>`}`;
+}
+// One round trip to Job Tracker for the whole week: fetch every job once,
+// add all the week's lines, save once. Returns which lines made it.
+async function pushLaborBatchToJobTracker(lines){
+  const res = await fetch(`${JOB_TRACKER_API_URL}?action=getAll`);
+  if(!res.ok) throw new Error('Could not reach Job Tracker');
+  const data = await res.json();
+  const jobs = data.jobs || [];
+  const sent = [], skipped = [];
+  lines.forEach(l=>{
+    const job = jobs.find(j=>j.id===l.jobId);
+    if(!job){ skipped.push({ line:l, reason:'job no longer in Job Tracker' }); return; }
+    if(!job.scopes || !job.scopes.mitigation){ skipped.push({ line:l, reason:'job has no Mitigation scope' }); return; }
+    if(Math.abs(l.amount) >= 0.01){
+      if(!Array.isArray(job.scopes.mitigation.laborCosts)) job.scopes.mitigation.laborCosts = [];
+      job.scopes.mitigation.laborCosts.push({ id: uid('TTLC'), amount: l.amount, date: l.date, note: l.note });
+      job.updatedAt = new Date().toISOString();
+    }
+    sent.push(l);
+  });
+  if(sent.some(l=>Math.abs(l.amount)>=0.01)){
+    const postRes = await fetch(JOB_TRACKER_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'saveJobs', data: jobs })
+    });
+    if(!postRes.ok) throw new Error('Job Tracker rejected the update');
+    const postData = await postRes.json().catch(()=>({}));
+    if(postData && postData.error) throw new Error(postData.error);
+  }
+  return { sent, skipped };
+}
+async function approveLaborWeek(sched, weekStart){
+  if(laborApprovalSending) return;
+  const w = buildLaborWeek(sched, weekStart);
+  if(w.flagged.length){ showToast('Fix the flagged clock times first'); return; }
+  if(!w.lines.length){ showToast('Nothing to send for this week'); return; }
+  const total = w.lines.reduce((s,l)=>s+l.amount,0);
+  const range = `${fmtDateShort(w.weekStart)} \u2013 ${fmtDateShort(w.weekEnd)}`;
+  if(!confirm(`Send ${w.lines.length} line${w.lines.length===1?'':'s'} ($${total.toFixed(2)} total) to Job Tracker for the ${sched==='weekly'?'Weekly':'Biweekly'} crew, ${range}?`)) return;
+  laborApprovalSending = true;
+  showToast('Sending to Job Tracker\u2026');
+  const shortRange = `${fmtDateShort(w.weekStart).replace(/, \d{4}$/,'')}\u2013${fmtDateShort(w.weekEnd).replace(/, \d{4}$/,'')}`;
+  const payload = w.lines.map(l=>({
+    ...l,
+    date: w.weekEnd,
+    note: `${l.name} \u2014 ${(l.ms/3600000).toFixed(2)} hrs, week of ${shortRange}${l.hadPrior ? ' (adjustment)' : ''}`
+  }));
+  try{
+    const { sent, skipped } = await pushLaborBatchToJobTracker(payload);
+    // Mark exactly the job logs that went out as sent, at their correct amount
+    const changed = new Map();
+    const stamp = nowIso();
+    sent.forEach(l=>{
+      l.logs.forEach(ref=>{
+        const entry = entries.find(e=>e.id===ref.entryId);
+        if(!entry) return;
+        const jl = entry.jobLogs.find(j=>j.id===ref.logId);
+        if(!jl) return;
+        jl.syncedToJobTracker = true;
+        jl.syncedAmount = ref.correct;
+        jl.syncedAt = stamp;
+        jl.approvedBy = currentUser.name;
+        changed.set(entry.id, entry);
+      });
+    });
+    if(changed.size) await saveEntriesMerged([...changed.values()]);
+    logAudit('Weekly labor approval', w.weekStart, [`Approved and sent ${sent.length} line(s), $${sent.reduce((s,l)=>s+l.amount,0).toFixed(2)}, for the ${sched==='weekly'?'Weekly':'Biweekly'} crew, ${range}`]);
+    laborApprovalSending = false;
+    if(skipped.length){
+      alert(`Sent ${sent.length} line(s). ${skipped.length} couldn't be sent:\n\n` + skipped.map(x=>`\u2022 ${x.line.jobName} (${x.line.name}): ${x.reason}`).join('\n') + `\n\nThose stay on the list until the job is fixed in Job Tracker.`);
+    } else {
+      showToast(`Sent to Job Tracker \u2014 $${total.toFixed(2)}`);
+    }
+    laborApprovalSelected = null;
+    renderLaborApproval();
+    checkLaborApprovalPrompt(false);
+  }catch(err){
+    laborApprovalSending = false;
+    console.error(err);
+    showToast('Send failed: ' + (err.message||'could not reach Job Tracker') + ' \u2014 nothing was marked as sent. Try again.');
+  }
+}
 async function autoSyncEmployeeWeek(employeeName, weekMonday){
   const emp = employees.find(x=>x.name===employeeName);
   const baseRate = emp ? (emp.hourlyRate||0) : 0;
   if(baseRate<=0) return;
   const weekRate = weekEffectiveRate(employeeName, weekMonday, baseRate);
-  const weekEntries = entries.filter(e=>e.employeeName===employeeName && mondayOf(e.date)===weekMonday);
+  const weekEntries = entries.filter(e=>e.employeeName===employeeName && weekStartFor(employeeName, e.date)===weekMonday);
   const changedEntries = [];
   for(const entry of weekEntries){
     let entryChanged = false;
@@ -1781,6 +2274,32 @@ function addDays(dateStr, n){
   const pad = n2=>String(n2).padStart(2,'0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
+/* ---- Pay schedules ----
+   Biweekly (the default): Mon–Sun weeks, paid every two weeks.
+   Weekly: Fri–Thu weeks, paid every week.
+   This only changes how weeks are counted (overtime, weekly totals,
+   payroll periods) — never what screens someone sees. Anyone not on the
+   employee list (e.g. a deleted name still in old entries) counts as
+   Biweekly. */
+function fridayOf(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const back = (d.getDay() + 2) % 7; // days since the most recent Friday
+  return addDays(dateStr, -back);
+}
+function paySchedule(name){
+  const emp = employees.find(e=>e.name===name);
+  if(isAdminRole(emp)) return 'biweekly'; // Admin staff are always on the Mon–Sun, every-two-weeks schedule
+  return (emp && emp.paySchedule==='weekly') ? 'weekly' : 'biweekly';
+}
+function payScheduleLabel(sched){
+  return sched==='weekly' ? 'Weekly (Fri–Thu)' : 'Biweekly (Mon–Sun)';
+}
+function weekStartForSchedule(sched, dateStr){
+  return sched==='weekly' ? fridayOf(dateStr) : mondayOf(dateStr);
+}
+function weekStartFor(name, dateStr){
+  return weekStartForSchedule(paySchedule(name), dateStr);
+}
 // Anyone over 40 hours in a Mon–Sun week earns time-and-a-half on the extra
 // hours. Rather than picking which specific hours "count" as overtime, the
 // premium is blended evenly across every hour that employee worked that
@@ -1788,9 +2307,11 @@ function addDays(dateStr, n){
 // (40×$20 + 4×$30) ÷ 44 = $21.36/hr on every hour logged that week. This
 // keeps day/job-level dollar figures summing exactly to the true weekly
 // total without needing to arbitrarily assign OT to one job over another.
-function weekEffectiveRate(employeeName, weekMonday, baseRate){
+// weekStart is that employee's own week start (a Monday for Biweekly, a
+// Friday for Weekly) — always get it from weekStartFor(name, date).
+function weekEffectiveRate(employeeName, weekStart, baseRate){
   if(!baseRate) return 0;
-  const weekEntries = entries.filter(e=>e.employeeName===employeeName && mondayOf(e.date)===weekMonday);
+  const weekEntries = entries.filter(e=>e.employeeName===employeeName && weekStartFor(employeeName, e.date)===weekStart);
   const totalHours = weekEntries.reduce((s,e)=>s+entryHoursMsForReport(e),0)/3600000;
   if(totalHours<=40 || totalHours===0) return baseRate;
   const regular = 40, ot = totalHours-40;
@@ -1803,11 +2324,12 @@ function openWeeklyReport(){
 }
 function renderWeeklyReport(){
   const anyDate = document.getElementById('weeklyReportDate').value || todayStr();
-  const monday = mondayOf(anyDate);
+  const sched = document.getElementById('weeklyReportSchedule').value || 'biweekly';
+  const monday = weekStartForSchedule(sched, anyDate); // a Friday for the Weekly crew
   const days = Array.from({length:7}, (_,i)=>addDays(monday,i));
-  document.getElementById('weeklyReportSummary').textContent = `Week of ${fmtDateShort(monday)} \u2013 ${fmtDateShort(days[6])}`;
-  const names = [...new Set([...employees.map(e=>e.name), ...entries.map(e=>e.employeeName)])].sort((a,b)=>a.localeCompare(b));
-  const dayLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  document.getElementById('weeklyReportSummary').textContent = `${payScheduleLabel(sched)} \u2014 week of ${fmtDateShort(monday)} \u2013 ${fmtDateShort(days[6])}`;
+  const names = [...new Set([...employees.map(e=>e.name), ...entries.map(e=>e.employeeName)])].filter(n=>paySchedule(n)===sched).sort((a,b)=>a.localeCompare(b));
+  const dayLabels = days.map(d=>new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'}));
   let rowsHtml = '';
   names.forEach(name=>{
     let totalMs = 0, anyStale = false;
@@ -1824,24 +2346,39 @@ function renderWeeklyReport(){
     rowsHtml += `<tr><td>${escapeHtml(name)}</td>${cells.map(c=>`<td>${c}</td>`).join('')}<td><b>${fmtDuration(totalMs)}</b></td></tr>`;
   });
   const wrap = document.getElementById('weeklyReportBody');
-  const letterhead = reportLetterheadHtml('Weekly Hours Report');
-  if(!rowsHtml){ wrap.innerHTML = letterhead + `<div class="empty">No hours logged this week.</div>`; return; }
+  const letterhead = reportLetterheadHtml(`Weekly Hours Report &mdash; ${sched==='weekly'?'Weekly':'Biweekly'} Crew`);
+  if(!rowsHtml){ wrap.innerHTML = letterhead + `<div class="empty">No hours logged this week for the ${sched==='weekly'?'Weekly':'Biweekly'} crew.</div>`; return; }
   wrap.innerHTML = letterhead + `<table class="report-table"><thead><tr><th>Employee</th>${dayLabels.map(d=>`<th>${d}</th>`).join('')}<th>Total</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
 }
 
 /* ============ 2-WEEK PAYROLL REPORT ============ */
+function defaultPayrollStart(sched){
+  // The most recently completed pay period for that schedule
+  return sched==='weekly' ? addDays(fridayOf(todayStr()), -7) : addDays(mondayOf(todayStr()), -14);
+}
 function openPayrollReport(){
-  const periodStart = addDays(mondayOf(todayStr()), -14);
-  document.getElementById('payrollStartDate').value = periodStart;
+  document.getElementById('payrollSchedule').value = 'biweekly';
+  document.getElementById('payrollStartDate').value = defaultPayrollStart('biweekly');
   renderPayrollReport();
   openModal('modalPayrollReport');
 }
+function onPayrollScheduleChange(){
+  const sched = document.getElementById('payrollSchedule').value;
+  document.getElementById('payrollStartDate').value = defaultPayrollStart(sched);
+  renderPayrollReport();
+}
 function renderPayrollReport(){
-  const start = document.getElementById('payrollStartDate').value;
+  const sched = document.getElementById('payrollSchedule').value || 'biweekly';
+  const picked = document.getElementById('payrollStartDate').value;
   const wrap = document.getElementById('payrollReportBody');
-  if(!start){ wrap.innerHTML = `<div class="empty">Pick a pay period start date.</div>`; return; }
-  const days = Array.from({length:14}, (_,i)=>addDays(start,i));
-  const names = [...new Set([...employees.map(e=>e.name), ...entries.map(e=>e.employeeName)])].sort((a,b)=>a.localeCompare(b));
+  if(!picked){ wrap.innerHTML = `<div class="empty">Pick a pay period start date.</div>`; return; }
+  // Snap whatever date was picked to the start of that schedule's week
+  const start = weekStartForSchedule(sched, picked);
+  const numDays = sched==='weekly' ? 7 : 14;
+  const days = Array.from({length:numDays}, (_,i)=>addDays(start,i));
+  const lastDay = days[days.length-1];
+  const reportTitle = sched==='weekly' ? 'Weekly Payroll Report' : '2-Week Payroll Report';
+  const names = [...new Set([...employees.map(e=>e.name), ...entries.map(e=>e.employeeName)])].filter(n=>paySchedule(n)===sched).sort((a,b)=>a.localeCompare(b));
   let html = '';
   names.forEach(name=>{
     let totalMs=0, week1Ms=0, week2Ms=0, anyStale=false;
@@ -1856,28 +2393,85 @@ function renderPayrollReport(){
     });
     if(totalMs===0 && !anyStale) return;
     html += `<div class="payroll-page">
-      ${reportLetterheadHtml('2-Week Payroll Report')}
+      ${reportLetterheadHtml(reportTitle)}
       <div class="ph-name">${escapeHtml(name)}</div>
-      <div class="ph-period">Pay period: ${fmtDateShort(days[0])} \u2013 ${fmtDateShort(days[13])}</div>
+      <div class="ph-period">${payScheduleLabel(sched)} pay period: ${fmtDateShort(days[0])} \u2013 ${fmtDateShort(lastDay)}</div>
       ${anyStale ? `<div class="hint" style="color:var(--red);font-weight:700;">\u26a0 One or more days below have a missing or impossible clock time and are excluded from this total \u2014 fix them in Adjust Times before running payroll.</div>` : ''}
       <table class="report-table"><thead><tr><th>Date</th><th>Day</th><th>Hours</th></tr></thead><tbody>
         ${dayRows.map(r=>`<tr><td>${fmtDateShort(r.d)}</td><td>${new Date(r.d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'})}</td><td>${r.ms>0?fmtDuration(r.ms):'\u2014'}${r.stale?` <span style="color:var(--red);">\u26a0 needs review</span>`:''}</td></tr>`).join('')}
       </tbody></table>
       <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:13px;">
-        <div>Week 1: <b>${fmtDuration(week1Ms)}</b></div>
-        <div>Week 2: <b>${fmtDuration(week2Ms)}</b></div>
+        ${numDays===14 ? `<div>Week 1: <b>${fmtDuration(week1Ms)}</b></div><div>Week 2: <b>${fmtDuration(week2Ms)}</b></div>` : ''}
         <div>Total: <b>${fmtDuration(totalMs)}</b></div>
       </div>
     </div>`;
   });
-  wrap.innerHTML = html || `<div class="empty">No hours logged in this period.</div>`;
+  wrap.innerHTML = html || `<div class="empty">No hours logged in this period for the ${sched==='weekly'?'Weekly':'Biweekly'} crew.</div>`;
 }
 
+/* ============ PRINTING (clean, full-page reports) ============
+   Printing used to send the phone-sized pop-up straight to the printer, so
+   wide tables got squeezed or cut off and input boxes/buttons came along
+   for the ride. Now the report's content is copied into a dedicated print
+   area: buttons and input boxes are stripped out, the filters used (dates,
+   employee, job) are written out as text under the letterhead, tables run
+   the full page width with repeating headers, and any report with a wide
+   table (Weekly, Detailed Labor, etc.) prints landscape automatically. */
+function fmtFilterValue(input){
+  const v = (input.value||'').trim();
+  if(!v) return '';
+  if(input.type==='date') return fmtDateShort(v);
+  if(input.tagName==='SELECT') return input.options[input.selectedIndex] ? input.options[input.selectedIndex].text : v;
+  return v;
+}
+function collectReportFilters(container){
+  const parts = [];
+  container.querySelectorAll('.field').forEach(f=>{
+    const label = f.querySelector('label');
+    const input = f.querySelector('input, select');
+    if(!label || !input) return;
+    const val = fmtFilterValue(input);
+    if(val) parts.push(`<b>${escapeHtml(label.textContent.trim())}:</b> ${escapeHtml(val)}`);
+  });
+  return parts.length ? `<div class="print-filters">${parts.join(' &nbsp;&middot;&nbsp; ')}</div>` : '';
+}
+function printReportContent(contentNode, filtersHtml){
+  const root = document.getElementById('printRoot');
+  const clone = contentNode.cloneNode(true);
+  clone.removeAttribute('id');
+  clone.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));
+  clone.querySelectorAll('button, input, select, textarea, datalist, .sheet-handle, .sheet-head, .field, .close-x, .del-btn').forEach(n=>n.remove());
+  clone.querySelectorAll('[style]').forEach(n=>{ if(/overflow/.test(n.getAttribute('style'))) n.style.overflow = 'visible'; });
+  if(filtersHtml){
+    const holder = document.createElement('div');
+    holder.innerHTML = filtersHtml;
+    const lh = clone.querySelector('.report-letterhead');
+    if(lh) lh.after(holder.firstElementChild); else clone.prepend(holder.firstElementChild);
+  }
+  const footer = document.createElement('div');
+  footer.className = 'print-footer';
+  footer.textContent = `Voda Cleaning & Restoration of Tucson — Confidential — Printed ${new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}`;
+  clone.appendChild(footer);
+  root.innerHTML = '';
+  root.appendChild(clone);
+  // Landscape for wide tables so every column fits legibly
+  let maxCols = 0;
+  clone.querySelectorAll('table').forEach(t=>{ const r = t.querySelector('tr'); if(r) maxCols = Math.max(maxCols, r.children.length); });
+  let pageStyle = document.getElementById('printPageStyle');
+  if(!pageStyle){ pageStyle = document.createElement('style'); pageStyle.id = 'printPageStyle'; document.head.appendChild(pageStyle); }
+  pageStyle.textContent = maxCols >= 7 ? '@page{ size: letter landscape; margin: 0.45in; }' : '@page{ size: letter portrait; margin: 0.5in; }';
+  document.body.classList.add('printing-report');
+  const cleanup = ()=>{ document.body.classList.remove('printing-report'); window.removeEventListener('afterprint', cleanup); };
+  window.addEventListener('afterprint', cleanup);
+  // Tiny delay lets the phone lay out the print copy (and its logo) first.
+  setTimeout(()=>window.print(), 150);
+}
 function printActiveModal(){
-  document.body.classList.add('printing-overlay');
-  window.print();
-  window.onafterprint = ()=>{ document.body.classList.remove('printing-overlay'); };
-  setTimeout(()=>document.body.classList.remove('printing-overlay'), 1000);
+  const open = [...document.querySelectorAll('.overlay.active')];
+  const overlay = open[open.length-1];
+  if(!overlay){ window.print(); return; }
+  const sheet = overlay.querySelector('.sheet');
+  printReportContent(sheet, collectReportFilters(sheet));
 }
 
 /* ============ BACKEND ============ */
@@ -1949,6 +2543,9 @@ function refreshOpenReports(){
   // right away rather than waiting for the next 30s tick.
   renderAdminFooter();
   checkMyOwnUnresolvedEntries();
+  checkLaborApprovalPrompt(false);
+  const la = document.getElementById('modalLaborApproval');
+  if(la && la.classList.contains('active') && !laborApprovalSending) renderLaborApproval();
 }
 async function saveEntriesMerged(entriesToUpsert){
   let latest;
@@ -2760,11 +3357,9 @@ function buildScopeSheetPrintHtml(s){
 }
 function printScopeSheetReport(){
   if(!currentScopeSheet) return;
-  document.getElementById('scopeSheetPrintArea').innerHTML = buildScopeSheetPrintHtml(currentScopeSheet);
-  document.body.classList.add('printing-overlay','printing-scope-report');
-  window.print();
-  window.onafterprint = ()=>{ document.body.classList.remove('printing-overlay','printing-scope-report'); };
-  setTimeout(()=>document.body.classList.remove('printing-overlay','printing-scope-report'), 1000);
+  const holder = document.createElement('div');
+  holder.innerHTML = buildScopeSheetPrintHtml(currentScopeSheet);
+  printReportContent(holder, '');
 }
 
 function renderSetupScreen(failed){
@@ -2870,10 +3465,31 @@ function activeJobLog(){
   const last = logs[logs.length-1];
   return (last && !last.endedAt) ? last : null;
 }
+// Every job a tech heads to gets a big, deliberate "Are you headed to ___?"
+// check first — picking a name from the dropdown opens it right away, and
+// so does typing a name and tapping the button. Nothing is logged until
+// they tap "Yes," which catches a mis-tap on the wrong job in the list.
+let pendingJobName = null;
 function startJob(){
   const input = document.getElementById('jobNameInput2');
-  const name = input.value.trim();
+  const name = input ? input.value.trim() : '';
   if(!name){ showToast('Enter or choose a job name'); return; }
+  askConfirmJob(name);
+}
+function askConfirmJob(name){
+  pendingJobName = name;
+  document.getElementById('confirmJobName').textContent = name;
+  openModal('modalConfirmJob');
+}
+function cancelStartJob(){
+  pendingJobName = null;
+  closeModal('modalConfirmJob');
+}
+function confirmStartJob(){
+  const name = pendingJobName;
+  pendingJobName = null;
+  closeModal('modalConfirmJob');
+  if(!name || !todayEntry) return;
   const active = activeJobLog();
   if(active) active.endedAt = nowIso();
   const jobId = jobTrackerMap[name.toLowerCase()] || null;
@@ -2904,7 +3520,6 @@ function startLunch(){
   todayEntry.lunchLog.push({ start: nowIso(), end: null });
   todayEntry.onLunch = true;
   persistToday();
-  autoSyncEmployeeWeek(todayEntry.employeeName, mondayOf(todayEntry.date));
   renderToday();
   showToast('Enjoy your lunch!');
 }
@@ -2952,7 +3567,6 @@ function clockOut(){
   const current = shifts[shifts.length-1];
   current.clockOutAt = nowIso();
   persistToday();
-  autoSyncEmployeeWeek(todayEntry.employeeName, mondayOf(todayEntry.date));
   renderToday();
   showToast('Clocked out — see you next time!');
 }
@@ -2982,8 +3596,7 @@ const PINNED_JOB_LABELS = [MEETING_JOB_LABEL, CLEANINGS_JOB_LABEL, EQUIPMENT_CLE
 // (currently just Miguel) — everyone else's pinned list is unchanged.
 function pinnedJobLabelsForCurrentUser(){
   const emp = currentUser ? employees.find(e=>e.name===currentUser.name) : null;
-  const jt = emp ? (emp.jobTitle || 'Operations') : 'Operations';
-  return jt === 'Print & Ops' ? [...PINNED_JOB_LABELS, PRINTING_JOB_LABEL] : PINNED_JOB_LABELS;
+  return canLogPrinting(emp) ? [...PINNED_JOB_LABELS, PRINTING_JOB_LABEL] : PINNED_JOB_LABELS;
 }
 function renderJobSearchResults(query){
   const box = document.getElementById('jobSearchResults');
@@ -2994,11 +3607,11 @@ function renderJobSearchResults(query){
   const rows = [];
   pinnedJobLabelsForCurrentUser().forEach(label=>{
     if(!q || label.toLowerCase().includes(q)){
-      rows.push(`<div class="jsr-row jsr-admin" onmousedown="selectJobSearchResult('${label}')">${label}</div>`);
+      rows.push(`<div class="jsr-row jsr-admin" onclick="selectJobSearchResult('${label}')">${label}</div>`);
     }
   });
   matches.slice(0,25).forEach(n=>{
-    rows.push(`<div class="jsr-row" onmousedown="selectJobSearchResult('${escapeHtml(n).replace(/'/g,"\\'")}')">${escapeHtml(n)}</div>`);
+    rows.push(`<div class="jsr-row" onclick="selectJobSearchResult('${escapeHtml(n).replace(/'/g,"\\'")}')">${escapeHtml(n)}</div>`);
   });
   if(rows.length===0){ box.classList.remove('show'); return; }
   box.innerHTML = rows.join('');
@@ -3009,6 +3622,7 @@ function selectJobSearchResult(name){
   if(input) input.value = name;
   const box = document.getElementById('jobSearchResults');
   if(box) box.classList.remove('show');
+  askConfirmJob(name);
 }
 document.addEventListener('click', (e)=>{
   const box = document.getElementById('jobSearchResults');
@@ -3264,7 +3878,7 @@ function renderEmployeeReport(){
   const weekTotals = {};
   let grandTotal = 0, anyStale = false;
   matches.forEach(e=>{
-    const wk = mondayOf(e.date);
+    const wk = weekStartFor(e.employeeName, e.date);
     if(entryNeedsHoursReview(e)) anyStale = true;
     const ms = entryHoursMsForReport(e);
     weekTotals[wk] = (weekTotals[wk]||0) + ms;
@@ -3275,8 +3889,9 @@ function renderEmployeeReport(){
     ${weekKeys.map(wk=>`<tr><td>${fmtDateShort(wk)}</td><td>${fmtDuration(weekTotals[wk])}</td></tr>`).join('')}
   </tbody></table>`;
 
+  const empSched = paySchedule(matches[0].employeeName);
   let biweekly = [];
-  for(let i=0;i<weekKeys.length;i+=2){
+  for(let i=0;i<weekKeys.length && empSched==='biweekly';i+=2){
     const w1 = weekKeys[i], w2 = weekKeys[i+1];
     const ms = weekTotals[w1] + (w2?weekTotals[w2]:0);
     const label = w2 ? `${fmtDateShort(w1)} \u2013 ${fmtDateShort(addDays(w2,6))}` : `${fmtDateShort(w1)} \u2013 ${fmtDateShort(addDays(w1,6))}`;
@@ -3288,10 +3903,9 @@ function renderEmployeeReport(){
     ${anyStale ? `<div class="hint" style="color:var(--red);font-weight:700;">\u26a0 One or more days in this range have a missing or impossible clock time and are excluded from the totals below \u2014 check Shift Times Needing Review.</div>` : ''}
     <div class="card-eyebrow">Jobs worked (${fmtDateShort(from)} \u2013 ${fmtDateShort(to)})</div>
     ${jobsTable}
-    <div class="card-eyebrow" style="margin-top:16px;">Weekly totals</div>
+    <div class="card-eyebrow" style="margin-top:16px;">Weekly totals &mdash; ${payScheduleLabel(empSched)}${empSched==='weekly' ? ' (each week is one pay period)' : ''}</div>
     ${weeklyTable}
-    <div class="card-eyebrow" style="margin-top:16px;">Biweekly totals (payroll)</div>
-    ${biweeklyTable}
+    ${empSched==='biweekly' ? `<div class="card-eyebrow" style="margin-top:16px;">Biweekly totals (payroll)</div>${biweeklyTable}` : ''}
     <div class="hint" style="margin-top:12px;font-weight:700;color:var(--ink);">Grand total: ${fmtDuration(grandTotal)}</div>`;
 }
 
@@ -3523,7 +4137,9 @@ function openCalendarJobDetail(jobId){
 
 function openMySignoff(){
   const to = todayStr();
-  document.getElementById('mySignoffFrom').value = mondayOf(addDays(to,-13));
+  const mySched = paySchedule(currentUser.name);
+  document.getElementById('mySignoffFrom').value = mySched==='weekly' ? addDays(fridayOf(to),-7) : mondayOf(addDays(to,-13));
+  document.getElementById('myPaySchedule').textContent = `Your pay schedule: ${payScheduleLabel(mySched)}${mySched==='weekly' ? ', paid every week' : ', paid every two weeks'}`;
   document.getElementById('mySignoffTo').value = to;
   renderMySignoff();
   const now = new Date();
@@ -3638,7 +4254,7 @@ function renderDetailedLaborReport(){
     byDate[date].forEach(e=>{
       const emp = employees.find(x=>x.name===e.employeeName);
       const baseRate = emp ? (emp.hourlyRate||0) : 0;
-      const rate = weekEffectiveRate(e.employeeName, mondayOf(e.date), baseRate);
+      const rate = weekEffectiveRate(e.employeeName, weekStartFor(e.employeeName, e.date), baseRate);
       const otTag = rate>baseRate ? ` <span style="color:var(--amber);font-weight:700;">(OT wk)</span>` : '';
       const stale = entryNeedsHoursReview(e);
       if(stale) anyStaleOverall = true;
@@ -3697,7 +4313,7 @@ function renderJobReport(){
     if(to && e.date>to) return;
     const emp = employees.find(x=>x.name===e.employeeName);
     const baseRate = emp ? (emp.hourlyRate||0) : 0;
-    const weekRate = weekEffectiveRate(e.employeeName, mondayOf(e.date), baseRate);
+    const weekRate = weekEffectiveRate(e.employeeName, weekStartFor(e.employeeName, e.date), baseRate);
     e.jobLogs.forEach(jl=>{
       if(jl.jobName.toLowerCase()!==jobName.toLowerCase()) return;
       const ms = (jl.endedAt?new Date(jl.endedAt):new Date()) - new Date(jl.startedAt);
@@ -3737,7 +4353,7 @@ function renderJobReport(){
     <div class="card-eyebrow" style="margin-top:16px;">Total per employee &amp; send to Job Tracker</div>
     ${perEmpTable}
     <div class="hint" style="margin-top:12px;font-weight:700;color:var(--ink);">Grand total (all employees): ${fmtDuration(grandTotal)}</div>
-    <div class="hint">Time is now sent to Job Tracker automatically when each employee clocks out, including overtime true-ups — this is mainly a backup in case that ever fails to go through.</div>`;
+    <div class="hint">Hours normally go to Job Tracker once a week through Reports &rarr; Weekly labor approval. The Send button here is only a backup for a single employee and job.</div>`;
 }
 async function sendLaborToJobTracker(employeeName, jobName, jobId, unsyncedMs, amount){
   if(!jobId){ showToast("This job isn't linked to Job Tracker"); return; }
@@ -3755,7 +4371,7 @@ async function sendLaborToJobTracker(employeeName, jobName, jobId, unsyncedMs, a
       if(e.employeeName!==employeeName) return;
       const emp = employees.find(x=>x.name===employeeName);
       const baseRate = emp ? (emp.hourlyRate||0) : 0;
-      const weekRate = weekEffectiveRate(employeeName, mondayOf(e.date), baseRate);
+      const weekRate = weekEffectiveRate(employeeName, weekStartFor(employeeName, e.date), baseRate);
       e.jobLogs.forEach(jl=>{
         if(jl.jobName.toLowerCase()!==jobName.toLowerCase() || jl.jobId!==jobId || !jl.endedAt) return;
         const ms = new Date(jl.endedAt) - new Date(jl.startedAt);
@@ -3835,13 +4451,56 @@ function toDatetimeLocal(iso){
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function fromDatetimeLocal(val){ return val ? new Date(val).toISOString() : null; }
+/* ---- Adjust Times: times are always pinned to the entry's own date ----
+   Previously each time box was a full date+time picker. A blank one (a new
+   shift, or a job with no end time yet) defaults to TODAY's date on most
+   phones, and changing "Entry date" only relabeled the day without moving
+   any of the actual timestamps — so a fix for Oct 3 made on Oct 5 could
+   keep Oct 5 clock times and show up on the wrong day. Now the boxes are
+   time-only, and every timestamp is re-anchored onto the entry date. */
+function toTimeLocal(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  const pad = n=>String(n).padStart(2,'0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+// Keeps the time of day (to the second) but moves it onto dateStr.
+function moveToDate(dateStr, iso){
+  const src = new Date(iso);
+  const d = new Date(dateStr+'T00:00:00');
+  d.setHours(src.getHours(), src.getMinutes(), src.getSeconds(), src.getMilliseconds());
+  return d.toISOString();
+}
+function anchorRange(dateStr, startIso, endIso){
+  const start = startIso ? moveToDate(dateStr, startIso) : null;
+  let end = endIso ? moveToDate(dateStr, endIso) : null;
+  if(start && end && new Date(end) < new Date(start)) end = moveToDate(addDays(dateStr,1), endIso); // ran past midnight
+  return [start, end];
+}
+function normalizeAdjustDraftDates(){
+  if(!adjustDraft) return;
+  const d = adjustDraft.date;
+  adjustDraft.shifts.forEach(s=>{ [s.clockInAt, s.clockOutAt] = anchorRange(d, s.clockInAt, s.clockOutAt); });
+  adjustDraft.jobLogs.forEach(j=>{ [j.startedAt, j.endedAt] = anchorRange(d, j.startedAt, j.endedAt); });
+  (adjustDraft.lunchLog||[]).forEach(l=>{ [l.start, l.end] = anchorRange(d, l.start, l.end); });
+}
+function setAdjustTime(group, i, field, hhmm){
+  adjustDraft[group][i][field] = hhmm ? new Date(`${adjustDraft.date}T${hhmm}`).toISOString() : null;
+  normalizeAdjustDraftDates();
+}
+function changeAdjustEntryDate(val){
+  if(!val || !adjustDraft) return;
+  adjustDraft.date = val;
+  normalizeAdjustDraftDates();
+  renderAdjustForm();
+}
 function renderAdjustForm(){
   const wrap = document.getElementById('adjustTimesBody');
   if(!adjustDraft){ wrap.innerHTML = `<div class="empty">Choose an employee and date.</div>`; return; }
   const shiftsHtml = adjustDraft.shifts.map((s,i)=>`
     <div style="display:flex;gap:8px;margin-bottom:10px;align-items:flex-end;">
-      <div class="field" style="flex:1;margin-bottom:0;"><label>Shift ${i+1} in</label><input type="datetime-local" value="${toDatetimeLocal(s.clockInAt)}" onchange="adjustDraft.shifts[${i}].clockInAt=fromDatetimeLocal(this.value)"></div>
-      <div class="field" style="flex:1;margin-bottom:0;"><label>Shift ${i+1} out</label><input type="datetime-local" value="${toDatetimeLocal(s.clockOutAt)}" onchange="adjustDraft.shifts[${i}].clockOutAt=fromDatetimeLocal(this.value)"></div>
+      <div class="field" style="flex:1;margin-bottom:0;"><label>Shift ${i+1} in</label><input type="time" value="${toTimeLocal(s.clockInAt)}" onchange="setAdjustTime('shifts',${i},'clockInAt',this.value)"></div>
+      <div class="field" style="flex:1;margin-bottom:0;"><label>Shift ${i+1} out</label><input type="time" value="${toTimeLocal(s.clockOutAt)}" onchange="setAdjustTime('shifts',${i},'clockOutAt',this.value)"></div>
       ${adjustDraft.shifts.length>1 ? `<button class="del-btn" style="flex-shrink:0;" onclick="deleteAdjustShift(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>` : ''}
     </div>`).join('');
   const jobsHtml = adjustDraft.jobLogs.map((jl,i)=>`
@@ -3851,13 +4510,14 @@ function renderAdjustForm(){
         <button class="del-btn" onclick="deleteAdjustJobLog(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
       </div>
       <div style="display:flex;gap:8px;">
-        <input type="datetime-local" style="flex:1;font-size:12px;" value="${toDatetimeLocal(jl.startedAt)}" onchange="adjustDraft.jobLogs[${i}].startedAt=fromDatetimeLocal(this.value)">
-        <input type="datetime-local" style="flex:1;font-size:12px;" value="${toDatetimeLocal(jl.endedAt)}" onchange="adjustDraft.jobLogs[${i}].endedAt=fromDatetimeLocal(this.value)">
+        <input type="time" style="flex:1;" value="${toTimeLocal(jl.startedAt)}" onchange="setAdjustTime('jobLogs',${i},'startedAt',this.value)">
+        <input type="time" style="flex:1;" value="${toTimeLocal(jl.endedAt)}" onchange="setAdjustTime('jobLogs',${i},'endedAt',this.value)">
       </div>
     </div>`).join('');
   wrap.innerHTML = `
-    <div class="field"><label>Entry date</label><input type="date" value="${adjustDraft.date}" onchange="adjustDraft.date=this.value"></div>
-    <div class="hint" style="margin-top:-8px;">Change this to move this whole day's entry to a different date (backdate a missed clock-in, fix a wrong day, etc.).</div>
+    <div class="hint" style="margin-top:0;font-size:14px;font-weight:700;color:var(--ink);">Editing: ${escapeHtml(adjustDraft.employeeName)} &mdash; ${fmtDateLong(adjustDraft.date)}</div>
+    <div class="field"><label>Entry date</label><input type="date" value="${adjustDraft.date}" onchange="changeAdjustEntryDate(this.value)"></div>
+    <div class="hint" style="margin-top:-8px;">Every time below is saved on this date. Change it to move the whole day — every shift and job moves with it. A clock-out earlier than the clock-in is treated as after midnight.</div>
     <div class="card-eyebrow" style="margin-top:14px;">Shifts</div>
     ${shiftsHtml || '<div class="empty">No shifts.</div>'}
     <button class="btn btn-ghost" style="width:100%;margin-top:4px;" onclick="addAdjustShift()">+ Add another shift</button>
@@ -3975,6 +4635,7 @@ async function saveAdjustTimes(){
   if(!adjustDraft || adjustSaveInFlight) return;
   const conflict = entries.find(e=>e.id!==adjustDraft.id && e.employeeName.toLowerCase()===adjustDraft.employeeName.toLowerCase() && e.date===adjustDraft.date);
   if(conflict){ showToast(`${adjustDraft.employeeName} already has a separate entry on ${fmtDateShort(adjustDraft.date)} — delete or move that one first.`); return; }
+  normalizeAdjustDraftDates(); // final safety net: every time lands on the entry date before saving
   const problem = findAdjustDraftProblem(adjustDraft);
   if(problem){ showToast(`Can't save — ${problem}`); return; }
   const isNewEntry = !adjustOriginal;
@@ -3986,7 +4647,13 @@ async function saveAdjustTimes(){
   if(ok){
     logAudit(adjustDraft.employeeName, adjustOriginal ? adjustOriginal.date : adjustDraft.date, changes);
     showToast(isNewEntry ? 'Time entry created' : 'Time entry updated');
-    if(todayEntry && todayEntry.id===adjustDraft.id){ todayEntry = adjustDraft; renderToday(); }
+    // If this was the employee's "today" entry and it just got moved to
+    // another date, it must stop showing as today on this device.
+    if(todayEntry && todayEntry.id===adjustDraft.id){
+      if(adjustDraft.date===todayStr()) todayEntry = adjustDraft;
+      else findTodayEntry();
+      renderToday();
+    }
     adjustOriginal = null;
     closeModal('modalAdjustTimes');
   }
