@@ -330,8 +330,17 @@ main.content{padding:16px 14px 4px;}
   #printRoot .card-eyebrow{ font-size:9pt; color:#333; margin:14px 0 5px; break-after:avoid; page-break-after:avoid; }
   #printRoot .hint{ background:#F1F3F5; font-size:9.5pt; }
   #printRoot .list-row{ border:1px solid #C9D0D8; break-inside:avoid; page-break-inside:avoid; padding:8px 10px; }
-  #printRoot .payroll-page{ border:none; padding:0; break-after:page; page-break-after:always; }
-  #printRoot .payroll-page:last-of-type{ break-after:auto; page-break-after:auto; }
+  #printRoot .payroll-page{ border:none; border-top:2px solid #0A0A0A; border-radius:0; padding:12px 0 0; margin:0 0 26px; break-inside:avoid; page-break-inside:avoid; }
+  #printRoot .payroll-page .ph-name{ font-size:13pt; font-weight:800; }
+  #printRoot .payroll-page .ph-period{ font-size:9.5pt; color:#555E6B; margin-bottom:6px; }
+  #printRoot .payroll-totals th{ background:#2B3440 !important; }
+  /* Compact rows so two employees fit on a page */
+  #printRoot .payroll-page .report-table{ font-size:8.5pt; }
+  #printRoot .payroll-page .report-table th{ padding:3px 7px; font-size:8pt; }
+  #printRoot .payroll-page .report-table td{ padding:2px 7px; }
+  #printRoot .payroll-page > div[style*="justify-content:space-between"]{ font-size:9.5pt !important; margin-top:5px !important; }
+  #printRoot .payroll-page .payroll-totals{ margin-top:5px !important; }
+  #printRoot .payroll-page .payroll-totals td{ padding:4px 7px; font-size:9pt; }
   #printRoot .scope-print-room{ break-inside:avoid; page-break-inside:avoid; }
   #printRoot svg{ max-width:100%; }
   #printRoot .print-footer{ margin-top:18px; padding-top:6px; border-top:1px solid #C9D0D8; font-size:8.5pt; color:#555E6B; text-align:center; }
@@ -351,7 +360,7 @@ main.content{padding:16px 14px 4px;}
   body.printing-overlay .close-x,
   body.printing-overlay input[type=date],
   body.printing-overlay .field label{ display:none !important; }
-  .payroll-page{ break-after:page; border:none; }
+  .payroll-page{ border:none; }
   /* Scope Sheet: print the compact drying-log report, not the live edit form */
   #scopeSheetPrintArea{ display:none; }
   body.printing-scope-report #scopeSheetDetailBody{ display:none !important; }
@@ -516,6 +525,7 @@ main.content{padding:16px 14px 4px;}
     <div class="help-h"><span class="num">1</span>Reports</div>
     <div class="help-p">Everything below lives under the Admin link at the bottom of the screen, inside Reports. What you see there depends on your permissions.</div>
     <div class="help-bullet">Who's clocked in right now</div>
+    <div class="help-bullet">After lunch, the app automatically puts techs back on the job they left. If they're going somewhere else, they just pick the new job.</div>
     <div class="help-bullet">Daily / Weekly / Payroll reports — Weekly and Payroll let you pick the Bi-Weekly or Weekly crew</div>
     <div class="help-bullet">Employee report — by name, any date range</div>
     <div class="help-bullet">Job report — everyone who worked a job, and a Send button to push hours to Job Tracker</div>
@@ -654,7 +664,7 @@ main.content{padding:16px 14px 4px;}
 <div class="overlay" id="modalPayrollReport"><div class="sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-head">
-    <div><div class="sheet-title">Payroll report</div><div class="sheet-sub">One page per employee, by pay schedule</div></div>
+    <div><div class="sheet-title">Payroll report</div><div class="sheet-sub">Each employee's hours, regular time &amp; overtime</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalPayrollReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -918,7 +928,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-10-05T23-55";
+const BUILD_ID = "2026-10-06T18-20";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -2434,20 +2444,49 @@ function renderPayrollReport(){
     });
     if(totalMs===0 && !anyStale) return;
     html += `<div class="payroll-page">
-      ${reportLetterheadHtml(reportTitle)}
       <div class="ph-name">${escapeHtml(name)}</div>
       <div class="ph-period">${payScheduleLabel(sched)} pay period: ${fmtDateShort(days[0])} \u2013 ${fmtDateShort(lastDay)}</div>
       ${anyStale ? `<div class="hint" style="color:var(--red);font-weight:700;">\u26a0 One or more days below have a missing or impossible clock time and are excluded from this total \u2014 fix them in Adjust Times before running payroll.</div>` : ''}
-      <table class="report-table"><thead><tr><th>Date</th><th>Day</th><th>Hours</th></tr></thead><tbody>
-        ${dayRows.map(r=>`<tr><td>${fmtDateShort(r.d)}</td><td>${new Date(r.d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'})}</td><td>${r.ms>0?fmtDuration(r.ms):'\u2014'}${r.stale?` <span style="color:var(--red);">\u26a0 needs review</span>`:''}</td></tr>`).join('')}
-      </tbody></table>
+      ${(()=>{
+        // Week 1 and Week 2 side by side: one row per weekday
+        const cell = r => `${r.ms>0?fmtDuration(r.ms):'\u2014'}${r.stale?` <span style="color:var(--red);">\u26a0 needs review</span>`:''}`;
+        const md = d => { const dt = new Date(d+'T00:00:00'); return `${dt.getMonth()+1}/${dt.getDate()}`; };
+        const wkday = d => new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'});
+        if(numDays===14){
+          return `<table class="report-table payroll-days"><thead><tr><th>Day</th><th>Week 1 date</th><th>Week 1 hours</th><th>Week 2 date</th><th>Week 2 hours</th></tr></thead><tbody>
+            ${dayRows.slice(0,7).map((r,i)=>{ const r2 = dayRows[i+7]; return `<tr><td>${wkday(r.d)}</td><td>${md(r.d)}</td><td>${cell(r)}</td><td>${md(r2.d)}</td><td>${cell(r2)}</td></tr>`; }).join('')}
+          </tbody></table>`;
+        }
+        return `<table class="report-table payroll-days"><thead><tr><th>Day</th><th>Date</th><th>Hours</th></tr></thead><tbody>
+          ${dayRows.map(r=>`<tr><td>${wkday(r.d)}</td><td>${md(r.d)}</td><td>${cell(r)}</td></tr>`).join('')}
+        </tbody></table>`;
+      })()}
       <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:13px;">
         ${numDays===14 ? `<div>Week 1: <b>${fmtDuration(week1Ms)}</b></div><div>Week 2: <b>${fmtDuration(week2Ms)}</b></div>` : ''}
         <div>Total: <b>${fmtDuration(totalMs)}</b></div>
       </div>
+      ${(()=>{
+        // Overtime is counted per week (anything past 40 hours in that
+        // week), then the two weeks are added together.
+        const H40 = 40*3600000;
+        const weeks = numDays===14 ? [week1Ms, week2Ms] : [totalMs];
+        const regMs = weeks.reduce((s,w)=>s+Math.min(w,H40),0);
+        const otMs = weeks.reduce((s,w)=>s+Math.max(0,w-H40),0);
+        const label = numDays===14 ? 'Pay period totals (2 weeks)' : 'Pay period totals';
+        return `<table class="report-table payroll-totals" style="margin-top:10px;">
+          <thead><tr><th>${label}</th><th>Regular (up to 40/wk)</th><th>Overtime (over 40/wk)</th><th>Total hours</th></tr></thead>
+          <tbody><tr>
+            <td>${numDays===14 ? `Wk 1: ${fmtDuration(Math.min(week1Ms,H40))} reg${week1Ms>H40?` + ${fmtDuration(week1Ms-H40)} OT`:''}<br>Wk 2: ${fmtDuration(Math.min(week2Ms,H40))} reg${week2Ms>H40?` + ${fmtDuration(week2Ms-H40)} OT`:''}` : '\u2014'}</td>
+            <td><b>${fmtDuration(regMs)}</b></td>
+            <td><b style="${otMs>0?'color:var(--red);':''}">${otMs>0?fmtDuration(otMs):'0h 0m'}</b></td>
+            <td><b>${fmtDuration(totalMs)}</b></td>
+          </tr></tbody>
+        </table>`;
+      })()}
     </div>`;
   });
-  wrap.innerHTML = html || `<div class="empty">No hours logged in this period for the ${sched==='weekly'?'Weekly':'Bi-Weekly'} crew.</div>`;
+  const header = reportLetterheadHtml(`${reportTitle} &mdash; ${sched==='weekly'?'Weekly':'Bi-Weekly'} Crew, ${fmtDateShort(days[0])} \u2013 ${fmtDateShort(lastDay)}`);
+  wrap.innerHTML = header + (html || `<div class="empty">No hours logged in this period for the ${sched==='weekly'?'Weekly':'Bi-Weekly'} crew.</div>`);
 }
 
 /* ============ PRINTING (clean, full-page reports) ============
@@ -2509,10 +2548,22 @@ function printReportContent(contentNode, filtersHtml){
   if(!pageStyle){ pageStyle = document.createElement('style'); pageStyle.id = 'printPageStyle'; document.head.appendChild(pageStyle); }
   pageStyle.textContent = maxCols >= 7 ? '@page{ size: letter landscape; margin: 0.45in; }' : '@page{ size: letter portrait; margin: 0.5in; }';
   document.body.classList.add('printing-report');
-  const cleanup = ()=>{ document.body.classList.remove('printing-report'); window.removeEventListener('afterprint', cleanup); };
-  window.addEventListener('afterprint', cleanup);
-  // Tiny delay lets the phone lay out the print copy (and its logo) first.
-  setTimeout(()=>window.print(), 150);
+  // The print copy stays ready (and the page stays in report mode for
+  // printing) until the next tap anywhere — iPhones sometimes ask "Allow
+  // printing?" first and print AFTER that, and if the report had already
+  // been cleared you'd get a picture of the phone screen instead.
+  clearTimeout(window._printCleanupTimer);
+  document.removeEventListener('pointerdown', window._printCleanupHandler, true);
+  window._printCleanupHandler = ()=>{
+    window._printCleanupTimer = setTimeout(()=>{
+      document.body.classList.remove('printing-report');
+      document.removeEventListener('pointerdown', window._printCleanupHandler, true);
+    }, 1500);
+  };
+  setTimeout(()=>document.addEventListener('pointerdown', window._printCleanupHandler, true), 500);
+  // Must run in the same tap as the Print button — any delay and iPhone
+  // Safari treats it as an unwanted automatic print and blocks it.
+  window.print();
 }
 function printActiveModal(){
   const open = [...document.querySelectorAll('.overlay.active')];
@@ -3560,6 +3611,8 @@ function returnToShop(){
 // whatever comes after, with zero special-casing needed elsewhere.
 function startLunch(){
   const active = activeJobLog();
+  // Remember which job they were on so it picks right back up after lunch
+  todayEntry.resumeJobAfterLunch = active ? { jobName: active.jobName, jobId: active.jobId || null } : null;
   if(active) active.endedAt = nowIso();
   const shifts = ensureShifts(todayEntry);
   const current = shifts[shifts.length-1];
@@ -3578,9 +3631,17 @@ function endLunch(){
     todayEntry.lunchLog[todayEntry.lunchLog.length-1].end = nowIso();
   }
   todayEntry.onLunch = false;
+  // Most of the time they go right back to the job they left for lunch, so
+  // restart its clock automatically. If they're going somewhere else, they
+  // just pick a new job like normal — that ends this one.
+  const resume = todayEntry.resumeJobAfterLunch;
+  todayEntry.resumeJobAfterLunch = null;
+  if(resume && resume.jobName){
+    todayEntry.jobLogs.push({ id: uid('JL'), jobName: resume.jobName, jobId: resume.jobId, startedAt: nowIso(), endedAt: null });
+  }
   persistToday();
   renderToday();
-  showToast('Welcome back!');
+  showToast(resume && resume.jobName ? `Welcome back! Back on ${resume.jobName} \u2014 pick a different job if you're heading somewhere else.` : 'Welcome back!');
 }
 // One-tap end of day for office/Admin staff — closes the job, skips Post-Trip
 // (there's no vehicle to check), and clocks out, all in a single button.
@@ -4459,8 +4520,12 @@ function loadAdjustEntry(){
   if(!name || !date){ wrap.innerHTML = `<div class="empty">Choose an employee and date.</div>`; adjustDraft = null; adjustOriginal = null; return; }
   const entry = entries.find(e=>e.employeeName.toLowerCase()===name.toLowerCase() && e.date===date);
   if(!entry){
+    // The name/date are held here rather than written into the button —
+    // writing them in with double quotes broke the button, so tapping it
+    // silently did nothing.
+    pendingCreateEntry = { name: matchEmployeeName(name), date };
     wrap.innerHTML = `<div class="empty">No time entry for ${escapeHtml(name)} on ${fmtDateShort(date)}.</div>
-      <button class="btn btn-gold" style="width:100%;margin-top:10px;" onclick="createAdjustEntry(${JSON.stringify(name)},${JSON.stringify(date)})">+ Create a new entry for this day</button>`;
+      <button class="btn btn-gold" style="width:100%;margin-top:10px;" onclick="createAdjustEntryFromPending()">+ Create a new entry for this day</button>`;
     adjustDraft = null; adjustOriginal = null; return;
   }
   ensureShifts(entry);
@@ -4475,18 +4540,32 @@ function loadAdjustEntry(){
 // leftover "today" entry to clean up and was easy to get wrong.
 // adjustOriginal stays null — that's the signal saveAdjustTimes() uses to
 // know this is a create, not an edit, for audit-log wording.
+let pendingCreateEntry = null;
+// Use the exact spelling from the employee list, so a typed "cruz" still
+// lands on Cruz's reports and payroll.
+function matchEmployeeName(name){
+  const emp = employees.find(e=>e.name.toLowerCase()===name.toLowerCase());
+  return emp ? emp.name : name;
+}
+function createAdjustEntryFromPending(){
+  if(!pendingCreateEntry) return;
+  const { name, date } = pendingCreateEntry;
+  pendingCreateEntry = null;
+  createAdjustEntry(name, date);
+}
 function createAdjustEntry(name, date){
+  const atDate = t => new Date(`${date}T${t}`).toISOString();
   adjustDraft = {
     id: uid('T'),
     employeeName: name,
     date: date,
     shifts: [{ clockInAt: new Date(date+'T09:00').toISOString(), clockOutAt: new Date(date+'T17:00').toISOString() }],
     vehicle: 'N/A (backfilled)',
-    preTripAt: nowIso(),
+    preTripAt: atDate('09:00'),
     jobLogs: [],
-    returnedToShopAt: nowIso(),
+    returnedToShopAt: atDate('17:00'),
     postTripChecks: { clean:false, gas:false, notApplicable:true },
-    postTripAt: nowIso(),
+    postTripAt: atDate('17:00'),
     updatedAt: nowIso()
   };
   adjustOriginal = null;
@@ -4571,6 +4650,11 @@ function renderAdjustForm(){
     <button class="btn btn-ghost" style="width:100%;margin-top:4px;" onclick="addAdjustShift()">+ Add another shift</button>
     <div class="card-eyebrow" style="margin-top:14px;">Job logs (blank end = still in progress)</div>
     ${jobsHtml || '<div class="empty">No jobs logged.</div>'}
+    <datalist id="adjustJobNameList">${[...PINNED_JOB_LABELS, PRINTING_JOB_LABEL, ...allJobNames()].map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <input id="adjustNewJobName" list="adjustJobNameList" placeholder="Job name (start typing)" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;">
+      <button class="btn btn-ghost" style="width:auto;padding:0 14px;" onclick="addAdjustJobLog()">+ Add job</button>
+    </div>
     <div class="btn-row" style="margin-top:16px;">
       <button class="btn btn-ghost" onclick="loadAdjustEntry()">Cancel</button>
       <button class="btn btn-gold" onclick="saveAdjustTimes()">Save Changes</button>
@@ -4578,6 +4662,25 @@ function renderAdjustForm(){
     <div style="height:1px;background:var(--line);margin:18px 0 14px;"></div>
     <button class="btn btn-red" onclick="deleteAdjustEntireEntry()">Delete This Entire Day's Entry</button>
     <div class="hint">For test data or a forgotten clock-in/out — permanently removes this whole day for this employee.</div>`;
+}
+// Adds a job to the day being edited. Its times start out matching the
+// day's first shift (or the end of the last job, if there already is one),
+// ready to adjust.
+function addAdjustJobLog(){
+  const input = document.getElementById('adjustNewJobName');
+  const typed = (input.value||'').trim();
+  if(!typed){ showToast('Type or pick a job name'); return; }
+  const known = [...PINNED_JOB_LABELS, PRINTING_JOB_LABEL, ...allJobNames()].find(n=>n.toLowerCase()===typed.toLowerCase());
+  const name = known || typed;
+  const firstShift = adjustDraft.shifts.find(sh=>sh.clockInAt) || null;
+  const lastJob = adjustDraft.jobLogs[adjustDraft.jobLogs.length-1];
+  const lastShift = [...adjustDraft.shifts].reverse().find(sh=>sh.clockOutAt) || null;
+  const start = (lastJob && lastJob.endedAt) || (firstShift && firstShift.clockInAt) || new Date(`${adjustDraft.date}T09:00`).toISOString();
+  const end = (lastShift && new Date(lastShift.clockOutAt) > new Date(start)) ? lastShift.clockOutAt : null;
+  adjustDraft.jobLogs.push({ id: uid('JL'), jobName: name, jobId: jobTrackerMap[name.toLowerCase()] || null, startedAt: start, endedAt: end });
+  normalizeAdjustDraftDates();
+  renderAdjustForm();
+  if(!known) showToast(`"${name}" isn't on the Job Tracker list, so its hours won't be sent to a job`);
 }
 function addAdjustShift(){
   adjustDraft.shifts.push({ clockInAt: null, clockOutAt: null });
