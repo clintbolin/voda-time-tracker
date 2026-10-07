@@ -299,6 +299,8 @@ main.content{padding:16px 14px 4px;}
 .report-letterhead .rl-title{font-size:17px;font-weight:800;color:var(--ink);margin-top:1px;}
 .report-letterhead .rl-date{font-size:11px;color:var(--muted);margin-top:2px;}
 
+.drying-table th, .drying-table td{ font-size:12px; }
+#modalDryingVisit .chip-sm, .card .chip-sm{ font-size:12px; padding:6px 12px; border:none; }
 /* ---- Professional print layout (see printReportContent) ---- */
 #printRoot{ display:none; }
 @media print{
@@ -342,6 +344,12 @@ main.content{padding:16px 14px 4px;}
   #printRoot .payroll-page .payroll-totals{ margin-top:5px !important; }
   #printRoot .payroll-page .payroll-totals td{ padding:4px 7px; font-size:9pt; }
   #printRoot .scope-print-room{ break-inside:avoid; page-break-inside:avoid; }
+  #printRoot .drying-table th, #printRoot .drying-table td{ font-size:8.5pt; padding:3px 5px; }
+  #printRoot .drying-table th{ white-space:normal; }
+  #printRoot .blank-form td{ height:24px; border:1px solid #9AA3AD !important; background:#fff !important; }
+  #printRoot .blank-form th{ border:1px solid #9AA3AD; }
+  #printRoot .drying-chart, #printRoot .drying-signoff, #printRoot .drying-info{ break-inside:avoid; page-break-inside:avoid; }
+  #printRoot .drying-chart svg{ max-height:3.3in; }
   #printRoot svg{ max-width:100%; }
   #printRoot .print-footer{ margin-top:18px; padding-top:6px; border-top:1px solid #C9D0D8; font-size:8.5pt; color:#555E6B; text-align:center; }
 }
@@ -873,7 +881,7 @@ main.content{padding:16px 14px 4px;}
   </div>
   <div class="field">
     <label>Find or start a job's scope sheet</label>
-    <input id="scopeSheetJobSearch" list="scopeSheetJobList" placeholder="Type a job/customer name" oninput="renderScopeSheetsHubList()">
+    <input id="scopeSheetJobSearch" placeholder="Search for a job" autocomplete="off" oninput="renderScopeSheetsHubList()">
     <datalist id="scopeSheetJobList"></datalist>
   </div>
   <div id="scopeSheetsHubBody"></div>
@@ -904,6 +912,16 @@ main.content{padding:16px 14px 4px;}
   <div id="adjustTimesBody"></div>
 </div></div>
 
+<!-- Drying Log: log a visit step by step / edit an area -->
+<div class="overlay" id="modalDryingVisit"><div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div><div class="sheet-title" id="dryingVisitTitle">Log a visit</div><div class="sheet-sub" id="dryingVisitSub"></div></div>
+    <button class="close-x" onclick="closeModalBack('modalDryingVisit')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div id="dryingVisitBody"></div>
+</div></div>
+
 <!-- "Are you headed to ___?" confirmation before any job is logged -->
 <div class="overlay" id="modalConfirmJob" style="align-items:center;padding:16px;"><div class="sheet" style="border-radius:20px;max-width:400px;text-align:center;padding:26px 20px 22px;">
   <div class="card-eyebrow">Confirm your job</div>
@@ -928,7 +946,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-10-06T18-20";
+const BUILD_ID = "2026-10-07T10-55";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -1016,10 +1034,18 @@ function fmtDateLong(dateStr){
   const d = new Date(dateStr+'T00:00:00');
   return d.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
 }
-function fmtDuration(ms){
+// Live running clocks on a tech's own screen (and Who's Clocked In):
+// hours and minutes, e.g. "2h 15m".
+function fmtClock(ms){
   const totalMin = Math.max(0, Math.round(ms/60000));
   const h = Math.floor(totalMin/60), m = totalMin%60;
   return h>0 ? `${h}h ${m}m` : `${m}m`;
+}
+// Every report: decimal hours, e.g. 3h 30m = "3.50 hrs", 3h 20m = "3.33 hrs".
+// Worked out from the exact minutes, rounded to two decimals.
+function fmtDuration(ms){
+  const totalMin = Math.max(0, Math.round(ms/60000));
+  return `${(totalMin/60).toFixed(2)} hrs`;
 }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function showToast(msg){
@@ -2027,6 +2053,14 @@ async function autoSyncEmployeeWeek(employeeName, weekMonday){
   }
   if(changedEntries.length) saveEntriesMerged(changedEntries);
 }
+// Job names must come from the list (Job Tracker + Manage Job List), so a
+// job is always spelled exactly one way. Returns the official spelling of
+// whatever was typed, or null if it isn't on the list.
+function officialJobName(typed, extra){
+  const t = String(typed||'').trim().toLowerCase();
+  if(!t) return null;
+  return [...(extra||[]), ...allJobNames()].find(n=>n.toLowerCase()===t) || null;
+}
 function allJobNames(){
   return [...new Set([...jobTrackerNames, ...jobNameList])].sort((a,b)=>a.localeCompare(b));
 }
@@ -2258,7 +2292,7 @@ function renderWhosOn(){
   wrap.innerHTML = onClock.map(e=>{
     const shifts = ensureShifts(e);
     const currentShift = shifts[shifts.length-1];
-    const elapsed = fmtDuration(new Date() - new Date(currentShift.clockInAt));
+    const elapsed = fmtClock(new Date() - new Date(currentShift.clockInAt));
     return `<div class="list-row">
       <div class="nm">${escapeHtml(e.employeeName)}<div style="font-size:11.5px;color:var(--muted);font-weight:500;margin-top:2px;">${escapeHtml(entryStatusText(e))} &middot; ${elapsed} so far</div></div>
     </div>`;
@@ -2478,7 +2512,7 @@ function renderPayrollReport(){
           <tbody><tr>
             <td>${numDays===14 ? `Wk 1: ${fmtDuration(Math.min(week1Ms,H40))} reg${week1Ms>H40?` + ${fmtDuration(week1Ms-H40)} OT`:''}<br>Wk 2: ${fmtDuration(Math.min(week2Ms,H40))} reg${week2Ms>H40?` + ${fmtDuration(week2Ms-H40)} OT`:''}` : '\u2014'}</td>
             <td><b>${fmtDuration(regMs)}</b></td>
-            <td><b style="${otMs>0?'color:var(--red);':''}">${otMs>0?fmtDuration(otMs):'0h 0m'}</b></td>
+            <td><b style="${otMs>0?'color:var(--red);':''}">${fmtDuration(otMs)}</b></td>
             <td><b>${fmtDuration(totalMs)}</b></td>
           </tr></tbody>
         </table>`;
@@ -2887,8 +2921,15 @@ function renderScopeSheetsHubList(){
   const wrap = document.getElementById('scopeSheetsHubBody');
   const matches = scopeSheets.filter(s=>!q || s.jobName.toLowerCase().includes(q)).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
   let html = '';
-  if(q && !scopeSheets.some(s=>s.jobName.toLowerCase()===q)){
-    html += `<button class="btn btn-gold" style="margin-bottom:10px;" onclick="openScopeSheetForJob('${escJs(qRaw)}')">+ Start scope sheet for "${escapeHtml(qRaw)}"</button>`;
+  if(q){
+    // Jobs from the list that match and don't have a sheet yet
+    const startable = allJobNames().filter(n=>n.toLowerCase().includes(q) && !scopeSheets.some(s=>s.jobName.toLowerCase()===n.toLowerCase())).slice(0,8);
+    if(startable.length){
+      html += `<div class="card-eyebrow" style="margin-top:0;">Start a new scope sheet</div>` + startable.map(n=>`<button class="btn btn-ghost" style="justify-content:flex-start;margin-bottom:6px;" onclick="openScopeSheetForJob('${escJs(n)}')">+ ${escapeHtml(n)}</button>`).join('');
+    } else if(!scopeSheets.some(s=>s.jobName.toLowerCase().includes(q))){
+      html += `<div class="empty">No job matches "${escapeHtml(qRaw)}". Check the spelling, or add it in Manage Job List first.</div>`;
+    }
+    if(matches.length) html += `<div class="card-eyebrow">Existing scope sheets</div>`;
   }
   if(matches.length===0 && !q){
     html += `<div class="empty">No scope sheets yet — search a job above to start one.</div>`;
@@ -2910,6 +2951,9 @@ function openScopeSheetForJob(jobName){
   if(!jobName) return;
   let sheet = scopeSheets.find(s=>s.jobName.toLowerCase()===jobName.toLowerCase());
   if(!sheet){
+    const official = officialJobName(jobName);
+    if(!official){ showToast('Pick a job from the list'); return; }
+    jobName = official;
     sheet = {
       id: uid('SS'),
       jobName,
@@ -3173,28 +3217,10 @@ function renderScopeSheetDetail(){
     ${roomsHtml}
     <button class="btn btn-gold" style="margin-top:6px;" onclick="addScopeRoom()">+ Add Room</button>
 
-    <div class="card-eyebrow" style="margin-top:16px;">Daily atmospheric &amp; equipment log</div>
-    <div class="hint" style="margin-bottom:8px;">This is the one place to log a visit — moisture readings for each room, plus the day's temp/humidity and equipment on site.</div>
-    ${dailyLogRows}
-    <div class="dlog-field"><label>Date</label><input type="date" value="${escapeHtml(d.date||todayStr())}" oninput="updateScopeDailyLogDraft('date', this.value)"></div>
-    <div class="dlog-field"><label>Time</label><input type="time" value="${escapeHtml(d.time||'')}" oninput="updateScopeDailyLogDraft('time', this.value)"></div>
-    ${roomMoistureFieldsHtml}
-    <div class="dlog-field"><label>Temperature (°F)</label><input type="text" inputmode="decimal" value="${escapeHtml(d.tempF||'')}" oninput="updateScopeDailyLogDraft('tempF', this.value)" placeholder="e.g. 78"></div>
-    <div class="dlog-field"><label>Relative humidity (%)</label><input type="text" inputmode="decimal" value="${escapeHtml(d.rh||'')}" oninput="updateScopeDailyLogDraft('rh', this.value)" placeholder="e.g. 45"></div>
-    <div class="dlog-field"><label>Dehumidifiers on site</label><input type="text" inputmode="numeric" value="${escapeHtml(d.dehus||'')}" oninput="updateScopeDailyLogDraft('dehus', this.value)" placeholder="e.g. 2"></div>
-    <div class="dlog-field"><label>Air movers on site</label><input type="text" inputmode="numeric" value="${escapeHtml(d.airMovers||'')}" oninput="updateScopeDailyLogDraft('airMovers', this.value)" placeholder="e.g. 8"></div>
-    <div class="dlog-field"><label>Air scrubbers on site</label><input type="text" inputmode="numeric" value="${escapeHtml(d.airScrubbers||'')}" oninput="updateScopeDailyLogDraft('airScrubbers', this.value)" placeholder="e.g. 1"></div>
-    <div class="dlog-field"><label>Technician</label><input list="scopeDailyLogTechList" value="${escapeHtml(d.technician||'')}" oninput="updateScopeDailyLogDraft('technician', this.value)" placeholder="Name"></div>
-    <datalist id="scopeDailyLogTechList">${techNames.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
-    <div class="dlog-field"><label>Notes</label><input value="${escapeHtml(d.notes||'')}" oninput="updateScopeDailyLogDraft('notes', this.value)" placeholder="Optional"></div>
-    <button class="btn btn-ghost" style="margin-top:6px;" onclick="addScopeDailyLog()">+ Add daily reading</button>
-
-    <div class="field" style="margin-top:16px;"><label>Final notes / verification</label>
-      <textarea onchange="updateScopeSheetField('finalNotes', this.value)" rows="3" placeholder="${DEFAULT_SCOPE_FINAL_NOTE}">${escapeHtml(s.finalNotes||'')}</textarea>
-    </div>
+    ${renderDryingLogSection(s)}
 
     <div class="btn-row" style="margin-top:16px;">
-      <button class="btn btn-ghost" onclick="printScopeSheetReport()">Print</button>
+      <button class="btn btn-ghost" onclick="printScopeSheetReport()">Print scope sheet</button>
       <button class="btn btn-black" onclick="closeScopeSheetDetail()">Done</button>
     </div>`;
 }
@@ -3428,7 +3454,9 @@ function scopeRoomPrintHtml(room){
 function buildScopeSheetPrintHtml(s){
   const techList = (s.technicians||'').split(',').map(x=>x.trim()).filter(Boolean);
   const rooms = s.rooms||[];
-  const chart = dryingProgressChartSvg(rooms);
+  const dl = getDrying(s);
+  const finalV = sortedVisits(dl).find(v=>v.final);
+  const chart = dryingChartsHtml(dl);
   return `${reportLetterheadHtml('Room Scope Sheet &mdash; Drying Log')}
     <div style="font-size:13px;margin-bottom:2px;"><b>Job:</b> ${escapeHtml(s.jobName)}</div>
     <div style="font-size:13px;margin-bottom:2px;"><b>Property address:</b> ${escapeHtml(s.propertyAddress||'—')}</div>
@@ -3436,19 +3464,19 @@ function buildScopeSheetPrintHtml(s){
     <div style="font-size:13px;margin-bottom:2px;"><b>Loss details:</b> ${escapeHtml(s.lossDescription||'—')}</div>
     <div style="font-size:13px;margin-bottom:14px;"><b>Technician(s):</b> ${escapeHtml(techList.join(', ')||'—')}</div>
 
-    <div class="card-eyebrow" style="margin-top:6px;">Moisture readings</div>
-    ${scopeMoistureTableHtml(rooms)}
+    <div class="card-eyebrow" style="margin-top:6px;">Moisture readings by area</div>
+    ${dryingMoistureTablesHtml(dl)}
 
     ${chart ? `<div class="card-eyebrow" style="margin-top:14px;">Drying progress</div><div style="margin-top:4px;">${chart}</div>` : ''}
 
-    <div class="card-eyebrow" style="margin-top:14px;">Daily atmospheric &amp; equipment log</div>
-    ${scopeDailyLogTableHtml(s.dailyLogs)}
+    <div class="card-eyebrow" style="margin-top:14px;">Atmospheric &amp; equipment log</div>
+    ${dryingAtmosTableHtml(dl)}
 
     <div class="card-eyebrow" style="margin-top:14px;">Room detail</div>
     ${rooms.length ? rooms.map(scopeRoomPrintHtml).join('') : '<div class="empty">No rooms recorded.</div>'}
 
     <div class="card-eyebrow" style="margin-top:14px;">Final notes</div>
-    <div style="font-size:12.5px;white-space:pre-wrap;">${escapeHtml(s.finalNotes || DEFAULT_SCOPE_FINAL_NOTE)}</div>
+    <div style="font-size:12.5px;white-space:pre-wrap;">${escapeHtml((finalV && finalV.finalNote) || s.finalNotes || DEFAULT_SCOPE_FINAL_NOTE)}</div>
 
     <div style="margin-top:24px;padding-top:10px;border-top:1px solid #10202E;font-size:11.5px;color:var(--muted);">
       Prepared by: ${escapeHtml(techList.join(', ')||s.createdBy||'—')} &nbsp;·&nbsp; Printed ${fmtDateShort(todayStr())}
@@ -3458,6 +3486,837 @@ function printScopeSheetReport(){
   if(!currentScopeSheet) return;
   const holder = document.createElement('div');
   holder.innerHTML = buildScopeSheetPrintHtml(currentScopeSheet);
+  printReportContent(holder, '');
+}
+
+/* ======================================================================
+   DRYING LOG (v2)
+   ----------------------------------------------------------------------
+   Lives inside a Scope Sheet but is its own section with its own data
+   (sheet.drying) — the Scope Sheet's rooms, materials, work performed and
+   scope lines are not touched by any of this.
+
+   sheet.drying = {
+     dateOfLoss, claimNumber, carrier, meter,
+     areas:  [{ id, name, location, dryStandard, standardSource }],
+     visits: [{ id, date, time, technician, initials,
+                affected:{tempF,rh,gpp}, unaffected:{...}, outside:{...},
+                readings:{ [areaId]: '21' },
+                dehus, airMovers, airScrubbers, equipChanges, repositioned, repositionNote,
+                notes, final, finalNote, signature, signedName, signedAt,
+                createdBy, createdAt }]
+   }
+
+   A tech logs each visit step by step (conditions -> moisture by area ->
+   equipment -> notes & sign-off). Areas are named by the tech, with up to
+   10 suggestions to pick from and edit. Everything prints as a 1-2 page
+   drying log with tables and a drying-progress graph.
+   ====================================================================== */
+const DRYING_AREA_SUGGESTIONS = ['Living Room','Kitchen','Bathroom','Bedroom','Hallway','Laundry Room','Dining Room','Family Room','Garage','Closet'];
+const DRYING_DEFAULT_FINAL_NOTE = 'Moisture readings taken throughout affected areas. Previously elevated drywall and framing have reached established drying goals based on unaffected comparison materials. Equipment removed after final verification. Photos and final moisture readings uploaded to job file.';
+const DRYING_CHART_COLORS = ['#4F86F7','#5DBB63','#E8804A','#E9B824','#8E6CCF','#2BA9A0','#D85C8A','#7A8699'];
+const DRYING_MAX_SERIES_PER_CHART = 8;
+const DRYING_DAYS_PER_TABLE = 7;
+
+// Builds the drying log for a sheet, converting the older one-reading-per-
+// room log the first time. The conversion is deterministic (ids come from
+// the old room/log ids), so it can safely run again on a fresh copy from
+// the server; it's saved for good the next time anything is changed.
+function getDrying(s){
+  if(s.drying) return s.drying;
+  const d = { dateOfLoss:'', claimNumber:'', carrier:'', meter:'', areas:[], visits:[] };
+  const rooms = s.rooms || [];
+  rooms.forEach(room=>{
+    if(!(room.readings||[]).length) return;
+    d.areas.push({ id:'DA-'+room.id, name: room.name || `Room ${room.roomNumber||1}`, location:'', dryStandard: room.dryStandard||'', standardSource:'' });
+  });
+  (s.dailyLogs||[]).forEach(l=>{
+    const readings = {};
+    (l.roomReadings||[]).forEach(rr=>{ readings['DA-'+rr.roomId] = rr.moisture; });
+    d.visits.push({
+      id: l.id, date: l.date, time: l.time||'', technician: l.technician||l.createdBy||'', initials:'',
+      affected: { tempF:l.tempF||'', rh:l.rh||'', gpp: l.gpp!=null ? l.gpp : null }, unaffected:{}, outside:{},
+      readings, dehus:l.dehus||'', airMovers:l.airMovers||'', airScrubbers:l.airScrubbers||'',
+      equipChanges:'', repositioned:false, repositionNote:'', notes:l.notes||'', final:false,
+      createdBy: l.createdBy||'', createdAt: l.createdAt||nowIso()
+    });
+  });
+  // Older readings that were logged on their own, outside a daily visit
+  rooms.forEach(room=>{
+    (room.readings||[]).forEach(rd=>{
+      if(rd.visitId && d.visits.some(v=>v.id===rd.visitId)) return;
+      const date = (rd.createdAt||'').slice(0,10) || todayStr();
+      let v = d.visits.find(x=>x.date===date);
+      if(!v){
+        v = { id:'LEG-'+date, date, time:'', technician: rd.createdBy||'', initials:'', affected:{}, unaffected:{}, outside:{}, readings:{}, dehus:'', airMovers:'', airScrubbers:'', equipChanges:'', repositioned:false, repositionNote:'', notes: rd.note||'', final:false, createdBy: rd.createdBy||'', createdAt: rd.createdAt||nowIso() };
+        d.visits.push(v);
+      }
+      if(v.readings['DA-'+room.id]==null) v.readings['DA-'+room.id] = rd.moisture;
+    });
+  });
+  if(s.finalNotes) d.finalNote = s.finalNotes;
+  s.drying = d;
+  return d;
+}
+function sortedVisits(d){
+  return (d.visits||[]).slice().sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
+}
+// "21" -> "21%", "18 WME" stays as typed
+function fmtMC(v){
+  const t = String(v==null?'':v).trim();
+  if(!t) return '';
+  return /^-?\d+(\.\d+)?$/.test(t) ? t+'%' : t;
+}
+function atGoal(reading, standard){
+  const r = parseMoistureValue(reading), g = parseMoistureValue(standard);
+  return r!==null && g!==null && r<=g;
+}
+function initialsOf(name){
+  return String(name||'').trim().split(/\s+/).map(w=>w[0]||'').slice(0,3).join('').toUpperCase();
+}
+function gppOf(t, rh){
+  const tf = parseFloat(t), r = parseFloat(rh);
+  return (isNaN(tf)||isNaN(r)) ? null : computeGPP(tf, r);
+}
+function equipmentChangeText(prev, cur){
+  const parts = [];
+  [['dehus','dehu'],['airMovers','air mover'],['airScrubbers','air scrubber']].forEach(([k,label])=>{
+    const a = parseInt(prev ? prev[k] : 0)||0, b = parseInt(cur[k])||0;
+    if(!prev){ if(b>0) parts.push(`${b} ${label}${b===1?'':'s'}`); return; }
+    if(b>a) parts.push(`Added ${b-a} ${label}${b-a===1?'':'s'}`);
+    if(b<a) parts.push(`Removed ${a-b} ${label}${a-b===1?'':'s'}`);
+  });
+  if(!prev) return parts.length ? 'Placed ' + parts.join(', ') : '';
+  return parts.join(', ');
+}
+// The visit right before `visit` (by date/time), ignoring the visit itself
+function previousVisit(d, date, time, excludeId){
+  const key = date + (time||'');
+  const before = sortedVisits(d).filter(v=>v.id!==excludeId && (v.date+(v.time||'')) < key);
+  return before[before.length-1] || null;
+}
+
+/* ---------------- On-screen section inside the Scope Sheet ---------------- */
+function renderDryingLogSection(s){
+  const d = getDrying(s);
+  const visits = sortedVisits(d);
+  const field = (key, label, ph, type) => `<div class="dlog-field"><label>${label}</label><input ${type==='date'?'type="date"':''} value="${escapeHtml(d[key]||'')}" placeholder="${ph||''}" onchange="updateDryingField('${key}', this.value)"></div>`;
+  const visitRows = visits.slice().reverse().map(v=>{
+    const readingsLine = d.areas.filter(a=>v.readings && v.readings[a.id]!=null && String(v.readings[a.id]).trim()!=='')
+      .map(a=>`<span style="white-space:nowrap;${atGoal(v.readings[a.id], a.dryStandard)?'color:var(--green);font-weight:700;':''}">${escapeHtml(a.name)}: ${escapeHtml(fmtMC(v.readings[a.id]))}</span>`).join(' &middot; ');
+    const af = v.affected||{};
+    return `<div class="list-row" style="align-items:flex-start;">
+      <div style="flex:1;min-width:0;">
+        <div class="nm">${v.final?'<span style="color:var(--green);">FINAL &middot; </span>':''}${fmtDateShort(v.date)}${v.time?` ${escapeHtml(fmtTimeStr(v.time))}`:''}${v.initials?` &middot; ${escapeHtml(v.initials)}`:''}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${af.tempF?escapeHtml(af.tempF)+'°F':'—'} / ${af.rh?escapeHtml(af.rh)+'% RH':'—'}${af.gpp!=null?` / ${af.gpp} GPP`:''} &middot; Dehus ${escapeHtml(v.dehus||'0')} &middot; AM ${escapeHtml(v.airMovers||'0')} &middot; AS ${escapeHtml(v.airScrubbers||'0')}</div>
+        ${readingsLine?`<div style="font-size:12.5px;margin-top:3px;">${readingsLine}</div>`:''}
+        ${v.notes?`<div style="font-size:12px;color:var(--muted);margin-top:3px;">${escapeHtml(v.notes)}</div>`:''}
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="chip-sm" style="cursor:pointer;" onclick="openDryingVisit('${v.id}')">Edit</button>
+        <button class="del-btn" title="Delete visit" onclick="deleteDryingVisit('${v.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </div>
+    </div>`;
+  }).join('') || `<div class="empty">No visits logged yet. Tap "Log a visit" to start.</div>`;
+  const areaRows = d.areas.map(a=>`
+    <div class="list-row">
+      <div style="flex:1;min-width:0;">
+        <div class="nm">${escapeHtml(a.name)}</div>
+        <div style="font-size:12px;color:var(--muted);">${escapeHtml(a.location||'—')} &middot; Goal ${escapeHtml(fmtMC(a.dryStandard)||'—')}${a.standardSource?` (${escapeHtml(a.standardSource)})`:''}</div>
+      </div>
+      <button class="chip-sm" style="cursor:pointer;" onclick="openDryingAreaEditor('${a.id}')">Edit</button>
+    </div>`).join('') || `<div class="empty">Areas are added during your first visit.</div>`;
+  return `
+    <div class="card" style="padding:14px;margin-top:16px;border:2px solid var(--gold);">
+      <div style="font-size:18px;font-weight:800;margin-bottom:2px;">Drying Log</div>
+      <div class="hint" style="margin:0 0 12px;">Log every monitoring visit here. It builds the moisture table, atmospheric log and drying graph for insurance.</div>
+      <button class="btn btn-gold" style="font-size:17px;padding:16px;" onclick="openDryingVisit()">+ Log a visit</button>
+
+      <div class="card-eyebrow" style="margin-top:16px;">Claim information</div>
+      ${field('dateOfLoss','Date of loss','','date')}
+      ${field('claimNumber','Claim number','e.g. 0123456789')}
+      ${field('carrier','Insurance carrier','e.g. State Farm')}
+      ${field('meter','Moisture meter used','e.g. Delmhorst pin meter, % MC')}
+
+      <div class="card-eyebrow" style="margin-top:12px;">Visits (${visits.length})</div>
+      ${visitRows}
+
+      <div class="card-eyebrow" style="margin-top:12px;">Monitoring areas (${d.areas.length})</div>
+      ${areaRows}
+
+      ${visits.length ? `
+        <div class="card-eyebrow" style="margin-top:14px;">Moisture readings</div>
+        <div style="overflow-x:auto;">${dryingMoistureTablesHtml(d)}</div>
+        <div class="card-eyebrow" style="margin-top:14px;">Drying progress</div>
+        ${dryingChartsHtml(d) || '<div class="empty">The graph appears once an area has two or more readings.</div>'}
+        <div class="card-eyebrow" style="margin-top:14px;">Atmospheric &amp; equipment log</div>
+        <div style="overflow-x:auto;">${dryingAtmosTableHtml(d)}</div>` : ''}
+
+      <div class="btn-row" style="margin-top:16px;">
+        <button class="btn btn-gold" onclick="printDryingLog()">Print drying log</button>
+      </div>
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-ghost" onclick="printBlankDryingForm()">Print blank form</button>
+        <button class="btn btn-ghost" onclick="printSampleDryingLog()">Print sample</button>
+      </div>
+    </div>`;
+}
+function fmtTimeStr(hhmm){
+  if(!hhmm) return '';
+  const [h,m] = hhmm.split(':').map(Number);
+  if(isNaN(h)) return hhmm;
+  return `${((h+11)%12)+1}:${String(m||0).padStart(2,'0')} ${h<12?'AM':'PM'}`;
+}
+function updateDryingField(key, value){
+  if(!currentScopeSheet) return;
+  getDrying(currentScopeSheet)[key] = value;
+  commitScopeSheetChange(null);
+}
+function deleteDryingVisit(id){
+  if(!currentScopeSheet) return;
+  const d = getDrying(currentScopeSheet);
+  const v = d.visits.find(x=>x.id===id);
+  if(!v) return;
+  if(!confirm(`Delete the ${fmtDateShort(v.date)} visit and all of its readings?`)) return;
+  d.visits = d.visits.filter(x=>x.id!==id);
+  commitScopeSheetChange(null, `Deleted drying log visit (${fmtDateShort(v.date)}) from ${currentScopeSheet.jobName}`, true);
+}
+
+/* ---------------- Editing an area (name, where, goal) ---------------- */
+let dryingAreaEditId = null;
+function openDryingAreaEditor(areaId){
+  const d = getDrying(currentScopeSheet);
+  const a = d.areas.find(x=>x.id===areaId);
+  if(!a) return;
+  dryingAreaEditId = areaId;
+  const used = d.visits.some(v=>v.readings && v.readings[areaId]!=null && String(v.readings[areaId]).trim()!=='');
+  document.getElementById('dryingVisitTitle').textContent = 'Edit area';
+  document.getElementById('dryingVisitSub').textContent = a.name;
+  document.getElementById('dryingVisitBody').innerHTML = `
+    ${dryingAreaNameField('dryingEditName', a.name)}
+    <div class="dlog-field"><label>Where the reading is taken</label><input id="dryingEditLoc" value="${escapeHtml(a.location||'')}" placeholder="e.g. North wall, drywall, 6 in. above floor"></div>
+    <div class="dlog-field"><label>Dry standard / goal (%)</label><input id="dryingEditStd" inputmode="decimal" value="${escapeHtml(a.dryStandard||'')}" placeholder="e.g. 10"></div>
+    <div class="dlog-field"><label>How the goal was set</label><input id="dryingEditSrc" value="${escapeHtml(a.standardSource||'')}" placeholder="e.g. Unaffected drywall, south bedroom"></div>
+    <button class="btn btn-gold" style="margin-top:6px;" onclick="saveDryingAreaEdit()">Save area</button>
+    <button class="btn btn-red" style="margin-top:10px;" onclick="deleteDryingArea()">${used?'Remove area and its readings':'Remove area'}</button>`;
+  openModal('modalDryingVisit');
+}
+function saveDryingAreaEdit(){
+  const d = getDrying(currentScopeSheet);
+  const a = d.areas.find(x=>x.id===dryingAreaEditId);
+  if(!a) return;
+  const name = document.getElementById('dryingEditName').value.trim();
+  if(!name){ showToast('Give the area a name'); return; }
+  a.name = name;
+  a.location = document.getElementById('dryingEditLoc').value.trim();
+  a.dryStandard = document.getElementById('dryingEditStd').value.trim();
+  a.standardSource = document.getElementById('dryingEditSrc').value.trim();
+  closeModal('modalDryingVisit');
+  commitScopeSheetChange(null, `Edited drying area "${a.name}" on ${currentScopeSheet.jobName}`, true);
+}
+function deleteDryingArea(){
+  const d = getDrying(currentScopeSheet);
+  const a = d.areas.find(x=>x.id===dryingAreaEditId);
+  if(!a) return;
+  if(!confirm(`Remove "${a.name}" from the drying log? Its readings on every visit are removed too.`)) return;
+  d.areas = d.areas.filter(x=>x.id!==a.id);
+  d.visits.forEach(v=>{ if(v.readings) delete v.readings[a.id]; });
+  closeModal('modalDryingVisit');
+  commitScopeSheetChange(null, `Removed drying area "${a.name}" from ${currentScopeSheet.jobName}`, true);
+}
+
+/* ---------------- Area name box with suggestion dropdown ---------------- */
+function dryingAreaNameField(id, value){
+  return `<div class="dlog-field" style="position:relative;"><label>Area / room name</label>
+    <input id="${id}" value="${escapeHtml(value||'')}" placeholder="Pick a suggestion or type your own" autocomplete="off"
+      onfocus="showDryingSuggestions('${id}')" oninput="showDryingSuggestions('${id}');dryingNameInput('${id}',this.value)" onblur="setTimeout(()=>hideDryingSuggestions('${id}'),180)">
+    <div class="job-search-results" id="${id}-sugg" style="position:absolute;left:0;right:0;z-index:5;"></div>
+  </div>`;
+}
+function showDryingSuggestions(id){
+  const input = document.getElementById(id), box = document.getElementById(id+'-sugg');
+  if(!input || !box) return;
+  const q = input.value.trim().toLowerCase();
+  const list = DRYING_AREA_SUGGESTIONS.filter(n=>!q || n.toLowerCase().includes(q)).slice(0,10);
+  if(!list.length){ box.classList.remove('show'); box.innerHTML=''; return; }
+  box.innerHTML = list.map(n=>`<div class="jsr-row" onmousedown="event.preventDefault()" onclick="pickDryingSuggestion('${id}','${n}')">${n}</div>`).join('');
+  box.classList.add('show');
+}
+function hideDryingSuggestions(id){
+  const box = document.getElementById(id+'-sugg');
+  if(box) box.classList.remove('show');
+}
+// Picking a suggestion fills the box and leaves the cursor at the end so
+// it can be made more specific right away ("Living Room" -> "Living Room North")
+function pickDryingSuggestion(id, name){
+  const input = document.getElementById(id);
+  if(!input) return;
+  input.value = name + ' ';
+  dryingNameInput(id, input.value);
+  hideDryingSuggestions(id);
+  input.focus();
+  try{ input.setSelectionRange(input.value.length, input.value.length); }catch(e){}
+}
+function dryingNameInput(id, value){
+  if(id==='dryingNewName' && dryingVisitDraft) dryingVisitDraft.newArea.name = value;
+}
+
+/* ---------------- Log a visit: step by step ---------------- */
+let dryingVisitDraft = null;
+const DRYING_STEPS = ['Conditions','Moisture','Equipment','Notes & sign-off'];
+function openDryingVisit(visitId){
+  if(!currentScopeSheet) return;
+  const d = getDrying(currentScopeSheet);
+  dryingAreaEditId = null;
+  const existing = visitId ? d.visits.find(v=>v.id===visitId) : null;
+  if(existing){
+    dryingVisitDraft = JSON.parse(JSON.stringify(existing));
+    dryingVisitDraft._editing = true;
+  } else {
+    const last = sortedVisits(d).slice(-1)[0];
+    const now = new Date();
+    dryingVisitDraft = {
+      id: uid('DV'), date: todayStr(), time: `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
+      technician: currentUser.name, initials: initialsOf(currentUser.name),
+      affected:{tempF:'',rh:''}, unaffected:{tempF:'',rh:''}, outside:{tempF:'',rh:''},
+      readings:{},
+      dehus: last ? (last.dehus||'') : '', airMovers: last ? (last.airMovers||'') : '', airScrubbers: last ? (last.airScrubbers||'') : '',
+      repositioned:false, repositionNote:'', notes:'', final:false, finalNote: DRYING_DEFAULT_FINAL_NOTE,
+      signature:'', signedName:'', signedAt:''
+    };
+  }
+  dryingVisitDraft._newAreas = [];
+  dryingVisitDraft.newArea = { name:'', location:'', dryStandard:'', standardSource:'', reading:'' };
+  dryingVisitDraft._showAddArea = d.areas.length===0;
+  dryingVisitDraft._step = 0;
+  renderDryingVisit();
+  openModal('modalDryingVisit');
+}
+function dvSet(path, value){
+  const parts = path.split('.');
+  let o = dryingVisitDraft;
+  for(let i=0;i<parts.length-1;i++){ o[parts[i]] = o[parts[i]] || {}; o = o[parts[i]]; }
+  o[parts[parts.length-1]] = value;
+}
+function dvAllAreas(){
+  const d = getDrying(currentScopeSheet);
+  return [...d.areas, ...dryingVisitDraft._newAreas];
+}
+function dvGoStep(n){
+  // Typed-in but unsaved new area: keep it rather than lose it
+  if(dryingVisitDraft._step===1 && n>1 && dryingVisitDraft.newArea.name.trim()){
+    if(!addDryingAreaFromDraft(true)) return;
+  }
+  dryingVisitDraft._step = Math.max(0, Math.min(DRYING_STEPS.length-1, n));
+  renderDryingVisit();
+  const sheet = document.querySelector('#modalDryingVisit .sheet');
+  if(sheet) sheet.scrollTop = 0;
+}
+function renderDryingVisit(){
+  const v = dryingVisitDraft;
+  const step = v._step;
+  document.getElementById('dryingVisitTitle').textContent = v._editing ? 'Edit visit' : 'Log a visit';
+  document.getElementById('dryingVisitSub').textContent = `${currentScopeSheet.jobName} — Step ${step+1} of ${DRYING_STEPS.length}: ${DRYING_STEPS[step]}`;
+  const progress = `<div style="display:flex;gap:5px;margin-bottom:14px;">${DRYING_STEPS.map((s,i)=>`<div onclick="dvGoStep(${i})" style="flex:1;cursor:pointer;text-align:center;font-size:10.5px;font-weight:700;color:${i===step?'var(--ink)':'var(--muted)'};"><div style="height:5px;border-radius:3px;margin-bottom:4px;background:${i<=step?'var(--gold)':'var(--line)'};"></div>${s}</div>`).join('')}</div>`;
+  let body = '';
+  if(step===0) body = dvStepConditions();
+  if(step===1) body = dvStepMoisture();
+  if(step===2) body = dvStepEquipment();
+  if(step===3) body = dvStepSignoff();
+  const nav = `<div class="btn-row" style="margin-top:18px;">
+    ${step>0 ? `<button class="btn btn-ghost" onclick="dvGoStep(${step-1})">Back</button>` : `<button class="btn btn-ghost" onclick="closeModal('modalDryingVisit')">Cancel</button>`}
+    ${step<DRYING_STEPS.length-1 ? `<button class="btn btn-gold" onclick="dvGoStep(${step+1})">Next</button>` : `<button class="btn btn-gold" onclick="saveDryingVisit()">${v._editing?'Save changes':'Save visit'}</button>`}
+  </div>`;
+  document.getElementById('dryingVisitBody').innerHTML = progress + body + nav;
+  if(step===3 && v.final) initSignaturePad();
+}
+function dvInput(label, path, value, ph, mode){
+  return `<div class="dlog-field"><label>${label}</label><input ${mode==='date'?'type="date"':mode==='time'?'type="time"':`inputmode="${mode||'text'}"`} value="${escapeHtml(value||'')}" placeholder="${ph||''}" oninput="dvSet('${path}', this.value);${path.endsWith('tempF')||path.endsWith('.rh')?'dvRefreshGpp()':''}"></div>`;
+}
+function dvGppText(grp){
+  const g = gppOf(grp.tempF, grp.rh);
+  return g==null ? 'GPP: fills in from temp + RH' : `GPP: <b>${g}</b>`;
+}
+function dvRefreshGpp(){
+  ['affected','unaffected','outside'].forEach(k=>{
+    const el = document.getElementById('dvGpp-'+k);
+    if(el) el.innerHTML = dvGppText(dryingVisitDraft[k]||{});
+  });
+}
+function dvConditionGroup(key, title, sub){
+  const g = dryingVisitDraft[key] || {};
+  return `<div class="card" style="padding:12px;margin-bottom:10px;">
+    <div style="font-weight:800;font-size:15px;">${title}</div>
+    ${sub?`<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">${sub}</div>`:''}
+    <div style="display:flex;gap:10px;">
+      <div style="flex:1;">${dvInput('Temp (°F)', key+'.tempF', g.tempF, 'e.g. 78', 'decimal')}</div>
+      <div style="flex:1;">${dvInput('RH (%)', key+'.rh', g.rh, 'e.g. 45', 'decimal')}</div>
+    </div>
+    <div id="dvGpp-${key}" style="font-size:14px;color:var(--ink);">${dvGppText(g)}</div>
+  </div>`;
+}
+function dvStepConditions(){
+  const v = dryingVisitDraft;
+  const techNames = [...new Set([...employees.filter(e=>!e.archived).map(e=>e.name)])].sort((a,b)=>a.localeCompare(b));
+  return `
+    <div style="display:flex;gap:10px;">
+      <div style="flex:1;">${dvInput('Date', 'date', v.date, '', 'date')}</div>
+      <div style="flex:1;">${dvInput('Time', 'time', v.time, '', 'time')}</div>
+    </div>
+    <div class="dlog-field"><label>Technician</label><input list="dvTechList" value="${escapeHtml(v.technician||'')}" oninput="dvSet('technician', this.value)"></div>
+    <datalist id="dvTechList">${techNames.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
+    ${dvConditionGroup('affected','Affected area','Inside the drying area — required')}
+    ${dvConditionGroup('unaffected','Unaffected area (optional)','A dry room in the same home, for comparison')}
+    ${dvConditionGroup('outside','Outside (optional)','')}`;
+}
+function dvStepMoisture(){
+  const v = dryingVisitDraft;
+  const d = getDrying(currentScopeSheet);
+  const prev = previousVisit(d, v.date, v.time, v.id);
+  const areas = dvAllAreas();
+  const cards = areas.map(a=>{
+    const val = v.readings[a.id] || '';
+    const last = prev && prev.readings ? prev.readings[a.id] : '';
+    const done = atGoal(val, a.dryStandard);
+    return `<div class="card" id="dvArea-${a.id}" style="padding:12px;margin-bottom:10px;border:2px solid ${done?'var(--green)':'var(--line)'};">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">
+        <div style="font-weight:800;font-size:16px;">${escapeHtml(a.name)}</div>
+        <div id="dvAreaBadge-${a.id}" style="font-size:12px;font-weight:800;color:var(--green);">${done?'AT GOAL ✓':''}</div>
+      </div>
+      <div style="font-size:12.5px;color:var(--muted);margin:2px 0 8px;">${escapeHtml(a.location||'')}${a.location?' · ':''}Goal ${escapeHtml(fmtMC(a.dryStandard)||'—')}${last?` · Last ${escapeHtml(fmtMC(last))}`:''}</div>
+      <input inputmode="decimal" value="${escapeHtml(val)}" placeholder="Today's reading (%)" style="width:100%;box-sizing:border-box;font-size:20px;font-weight:700;padding:14px;border:1.5px solid var(--line);border-radius:10px;" oninput="dvSetReading('${a.id}', this.value)">
+    </div>`;
+  }).join('');
+  const na = v.newArea;
+  const addForm = v._showAddArea ? `
+    <div class="card" style="padding:12px;margin-bottom:10px;border:2px dashed var(--gold);">
+      <div style="font-weight:800;font-size:15px;margin-bottom:8px;">New area</div>
+      ${dryingAreaNameField('dryingNewName', na.name)}
+      <div class="dlog-field"><label>Where the reading is taken</label><input value="${escapeHtml(na.location)}" placeholder="e.g. North wall, drywall, 6 in. above floor" oninput="dvSet('newArea.location', this.value)"></div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;"><div class="dlog-field"><label>Dry goal (%)</label><input inputmode="decimal" value="${escapeHtml(na.dryStandard)}" placeholder="e.g. 10" oninput="dvSet('newArea.dryStandard', this.value)"></div></div>
+        <div style="flex:1;"><div class="dlog-field"><label>Today's reading (%)</label><input inputmode="decimal" value="${escapeHtml(na.reading)}" placeholder="e.g. 28" oninput="dvSet('newArea.reading', this.value)"></div></div>
+      </div>
+      <div class="dlog-field"><label>How the goal was set</label><input value="${escapeHtml(na.standardSource)}" placeholder="e.g. Unaffected drywall, south bedroom" oninput="dvSet('newArea.standardSource', this.value)"></div>
+      <button class="btn btn-gold" onclick="addDryingAreaFromDraft()">Save this area</button>
+    </div>` : '';
+  return `
+    ${areas.length ? `<div class="hint" style="margin-top:0;">Enter today's reading for each area. A box turns green when it reaches its goal.</div>` : `<div class="hint" style="margin-top:0;">Add the first area you're monitoring. You'll add each one, one at a time.</div>`}
+    ${cards}
+    ${addForm}
+    ${v._showAddArea ? '' : `<button class="btn btn-ghost" style="border:2px dashed var(--line);" onclick="dvShowAddArea()">+ Add new area</button>`}`;
+}
+function dvShowAddArea(){
+  dryingVisitDraft._showAddArea = true;
+  renderDryingVisit();
+  setTimeout(()=>{ const el = document.getElementById('dryingNewName'); if(el){ el.scrollIntoView({block:'center'}); el.focus(); } }, 50);
+}
+function dvSetReading(areaId, value){
+  dryingVisitDraft.readings[areaId] = value;
+  const a = dvAllAreas().find(x=>x.id===areaId);
+  const done = a && atGoal(value, a.dryStandard);
+  const card = document.getElementById('dvArea-'+areaId), badge = document.getElementById('dvAreaBadge-'+areaId);
+  if(card) card.style.borderColor = done ? 'var(--green)' : 'var(--line)';
+  if(badge) badge.textContent = done ? 'AT GOAL ✓' : '';
+}
+function addDryingAreaFromDraft(silent){
+  const v = dryingVisitDraft;
+  const nameEl = document.getElementById('dryingNewName');
+  if(nameEl) v.newArea.name = nameEl.value;
+  const na = v.newArea;
+  const name = na.name.trim();
+  if(!name){ showToast('Give the area a name'); return false; }
+  if(dvAllAreas().some(a=>a.name.toLowerCase()===name.toLowerCase() && (a.location||'').toLowerCase()===na.location.trim().toLowerCase())){
+    showToast('That area is already on the list — add a direction or detail to tell them apart');
+    return false;
+  }
+  const area = { id: uid('DA'), name, location: na.location.trim(), dryStandard: na.dryStandard.trim(), standardSource: na.standardSource.trim() };
+  v._newAreas.push(area);
+  if(na.reading.trim()) v.readings[area.id] = na.reading.trim();
+  v.newArea = { name:'', location:'', dryStandard: na.dryStandard, standardSource: na.standardSource, reading:'' };
+  v._showAddArea = false;
+  if(!silent){ renderDryingVisit(); showToast(`${name} added — tap "+ Add new area" for the next one`); }
+  return true;
+}
+function dvStepEquipment(){
+  const v = dryingVisitDraft;
+  const d = getDrying(currentScopeSheet);
+  const prev = previousVisit(d, v.date, v.time, v.id);
+  const stepper = (key, label) => `<div class="card" style="padding:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+    <div style="font-weight:800;font-size:16px;">${label}${prev?`<div style="font-size:12px;font-weight:600;color:var(--muted);">Last visit: ${escapeHtml(prev[key]||'0')}</div>`:''}</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="btn btn-ghost" style="width:48px;height:48px;padding:0;font-size:24px;" onclick="dvStep('${key}',-1)">&minus;</button>
+      <input id="dvEq-${key}" inputmode="numeric" value="${escapeHtml(v[key]||'0')}" style="width:58px;text-align:center;font-size:22px;font-weight:800;padding:10px 4px;border:1.5px solid var(--line);border-radius:10px;" oninput="dvSet('${key}', this.value);dvRefreshEquipChange()">
+      <button class="btn btn-ghost" style="width:48px;height:48px;padding:0;font-size:24px;" onclick="dvStep('${key}',1)">+</button>
+    </div>
+  </div>`;
+  return `
+    <div class="hint" style="margin-top:0;">Count what's on site now. Counts start from the last visit.</div>
+    ${stepper('dehus','Dehumidifiers')}
+    ${stepper('airMovers','Air movers')}
+    ${stepper('airScrubbers','Air scrubbers')}
+    <div id="dvEquipChange" class="hint" style="font-weight:700;color:var(--ink);">${dvEquipChangeText()}</div>
+    <label style="display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;margin:12px 0 8px;cursor:pointer;"><input type="checkbox" style="width:22px;height:22px;" ${v.repositioned?'checked':''} onchange="dvSet('repositioned', this.checked);renderDryingVisit()"> Equipment repositioned</label>
+    ${v.repositioned ? `<div class="dlog-field"><label>What was moved</label><input value="${escapeHtml(v.repositionNote||'')}" placeholder="e.g. Moved 2 air movers from kitchen to hall" oninput="dvSet('repositionNote', this.value)"></div>` : ''}`;
+}
+function dvStep(key, delta){
+  const n = Math.max(0, (parseInt(dryingVisitDraft[key])||0) + delta);
+  dryingVisitDraft[key] = String(n);
+  const el = document.getElementById('dvEq-'+key);
+  if(el) el.value = n;
+  dvRefreshEquipChange();
+}
+function dvEquipChangeText(){
+  const v = dryingVisitDraft;
+  const prev = previousVisit(getDrying(currentScopeSheet), v.date, v.time, v.id);
+  const t = equipmentChangeText(prev, v);
+  return t ? `Change: ${t}` : (prev ? 'No change from last visit' : '');
+}
+function dvRefreshEquipChange(){
+  const el = document.getElementById('dvEquipChange');
+  if(el) el.textContent = dvEquipChangeText();
+}
+function dvStepSignoff(){
+  const v = dryingVisitDraft;
+  const notAtGoal = dvAllAreas().filter(a=>{
+    const r = v.readings[a.id];
+    return !(r && atGoal(r, a.dryStandard));
+  });
+  return `
+    <div class="dlog-field"><label>Notes / drying progress</label><textarea rows="3" style="width:100%;box-sizing:border-box;font-size:16px;padding:12px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;" placeholder="e.g. Readings dropping in all areas. Removed baseboard in hall." oninput="dvSet('notes', this.value)">${escapeHtml(v.notes||'')}</textarea></div>
+    <div class="dlog-field"><label>Technician initials</label><input value="${escapeHtml(v.initials||'')}" maxlength="4" style="text-transform:uppercase;width:120px;" oninput="dvSet('initials', this.value.toUpperCase())"></div>
+    <label style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;margin:14px 0 8px;cursor:pointer;padding:12px;border-radius:10px;background:${v.final?'rgba(46,160,90,.12)':'var(--gray-bg)'};"><input type="checkbox" style="width:24px;height:24px;" ${v.final?'checked':''} onchange="dvSetFinal(this.checked)"> This is the FINAL visit (drying complete)</label>
+    ${v.final ? `
+      ${notAtGoal.length ? `<div class="hint" style="color:var(--red);font-weight:700;">⚠ Not at goal yet: ${notAtGoal.map(a=>escapeHtml(a.name)).join(', ')}. Check those readings before signing off.</div>` : `<div class="hint" style="color:var(--green);font-weight:700;">✓ Every area is at its goal.</div>`}
+      <div class="dlog-field"><label>Final verification note</label><textarea rows="5" style="width:100%;box-sizing:border-box;font-size:15px;padding:12px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;" oninput="dvSet('finalNote', this.value)">${escapeHtml(v.finalNote||DRYING_DEFAULT_FINAL_NOTE)}</textarea></div>
+      <div class="dlog-field"><label>Signature (sign with your finger)</label>
+        <div style="position:relative;border:1.5px solid var(--line);border-radius:10px;background:#fff;">
+          <canvas id="sigPad" style="width:100%;height:160px;display:block;touch-action:none;border-radius:10px;"></canvas>
+          <div style="position:absolute;left:16px;right:16px;bottom:34px;border-bottom:1.5px solid #9aa3ad;pointer-events:none;"></div>
+          <div style="position:absolute;left:16px;bottom:12px;font-size:11px;color:#9aa3ad;pointer-events:none;">✕ Sign above the line</div>
+        </div>
+        <button class="chip-sm" style="cursor:pointer;margin-top:6px;" onclick="clearSignature()">Clear signature</button>
+      </div>
+      <div class="dlog-field"><label>Printed name</label><input value="${escapeHtml(v.signedName||v.technician||'')}" oninput="dvSet('signedName', this.value)"></div>` : ''}`;
+}
+function dvSetFinal(on){
+  dryingVisitDraft.final = !!on;
+  if(on && !dryingVisitDraft.signedName) dryingVisitDraft.signedName = dryingVisitDraft.technician || currentUser.name;
+  renderDryingVisit();
+}
+
+/* ---------------- Finger signature ----------------
+   Saved as the pen strokes themselves (a short list of points, a few KB)
+   rather than an image, so it's small enough to store with the job and
+   prints sharp at any size. */
+let sigStrokes = [];
+function initSignaturePad(){
+  const canvas = document.getElementById('sigPad');
+  if(!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = rect.width * ratio; canvas.height = rect.height * ratio;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(ratio, ratio);
+  ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#10202E';
+  // Points are kept on a fixed 600 x 160 grid regardless of screen size
+  const SX = 600/rect.width, SY = 160/rect.height;
+  sigStrokes = parseSignature(dryingVisitDraft.signature);
+  const redraw = ()=>{
+    ctx.clearRect(0,0,rect.width,rect.height);
+    sigStrokes.forEach(st=>{ ctx.beginPath(); st.forEach((p,i)=>{ const x=p[0]/SX, y=p[1]/SY; i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); if(st.length===1) ctx.lineTo(st[0][0]/SX+0.1, st[0][1]/SY); ctx.stroke(); });
+  };
+  redraw();
+  let drawing = false;
+  const pt = e => { const r = canvas.getBoundingClientRect(); return [Math.round((e.clientX-r.left)*SX), Math.round((e.clientY-r.top)*SY)]; };
+  canvas.onpointerdown = e => { e.preventDefault(); drawing = true; canvas.setPointerCapture(e.pointerId); sigStrokes.push([pt(e)]); redraw(); };
+  canvas.onpointermove = e => {
+    if(!drawing) return; e.preventDefault();
+    const st = sigStrokes[sigStrokes.length-1], p = pt(e), q = st[st.length-1];
+    if(Math.abs(p[0]-q[0])+Math.abs(p[1]-q[1]) < 3) return;
+    st.push(p); redraw();
+  };
+  const end = () => { if(!drawing) return; drawing = false; dryingVisitDraft.signature = serializeSignature(sigStrokes); };
+  canvas.onpointerup = end; canvas.onpointercancel = end; canvas.onpointerleave = end;
+}
+function clearSignature(){
+  sigStrokes = [];
+  dryingVisitDraft.signature = '';
+  initSignaturePad();
+}
+function serializeSignature(strokes){
+  return strokes.filter(s=>s.length).map(s=>s.map(p=>p.join(',')).join(' ')).join('|');
+}
+function parseSignature(str){
+  if(!str) return [];
+  return str.split('|').map(s=>s.split(' ').map(p=>p.split(',').map(Number)).filter(p=>p.length===2 && !isNaN(p[0])));
+}
+function signatureSvg(str, height){
+  const strokes = parseSignature(str);
+  if(!strokes.length) return '';
+  const h = height || 54;
+  return `<svg viewBox="0 0 600 160" style="height:${h}px;width:auto;display:block;" preserveAspectRatio="xMinYMid meet">${strokes.map(st=>`<polyline points="${st.map(p=>p.join(',')).join(' ')}" fill="none" stroke="#10202E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`).join('')}</svg>`;
+}
+
+/* ---------------- Save a visit ---------------- */
+function saveDryingVisit(){
+  const v = dryingVisitDraft;
+  if(!v) return;
+  if(v._showAddArea && v.newArea.name.trim()){ if(!addDryingAreaFromDraft(true)) { v._step = 1; renderDryingVisit(); return; } }
+  const af = v.affected || {};
+  const anyReading = Object.values(v.readings||{}).some(x=>String(x).trim());
+  if(!String(af.tempF||'').trim() && !String(af.rh||'').trim() && !anyReading && !String(v.notes||'').trim()){
+    showToast('Enter the conditions or at least one moisture reading first');
+    return;
+  }
+  if(v.final){
+    const missing = dvAllAreas().filter(a=>!(v.readings[a.id] && atGoal(v.readings[a.id], a.dryStandard)));
+    if(missing.length && !confirm(`These areas aren't at their goal yet:\n\n${missing.map(a=>`• ${a.name}`).join('\n')}\n\nSave as the FINAL visit anyway?`)) return;
+    if(!v.signature){ if(!confirm('No signature yet. Save the final visit without a signature?')) return; }
+  }
+  const d = getDrying(currentScopeSheet);
+  v._newAreas.forEach(a=>{ if(!d.areas.some(x=>x.id===a.id)) d.areas.push(a); });
+  ['affected','unaffected','outside'].forEach(k=>{ v[k] = v[k]||{}; v[k].gpp = gppOf(v[k].tempF, v[k].rh); });
+  const prev = previousVisit(d, v.date, v.time, v.id);
+  v.equipChanges = equipmentChangeText(prev, v);
+  // Strip blanks so the record stays clean
+  Object.keys(v.readings).forEach(k=>{ if(!String(v.readings[k]).trim()) delete v.readings[k]; });
+  if(v.final){ v.signedAt = v.signature ? (v.signedAt || nowIso()) : ''; }
+  else { v.signature = ''; v.signedName = ''; v.signedAt = ''; }
+  const record = {};
+  ['id','date','time','technician','initials','affected','unaffected','outside','readings','dehus','airMovers','airScrubbers','equipChanges','repositioned','repositionNote','notes','final','finalNote','signature','signedName','signedAt'].forEach(k=>record[k]=v[k]);
+  const existingIdx = d.visits.findIndex(x=>x.id===v.id);
+  if(existingIdx>-1){
+    record.createdBy = d.visits[existingIdx].createdBy; record.createdAt = d.visits[existingIdx].createdAt;
+    record.editedBy = currentUser.name; record.editedAt = nowIso();
+    d.visits[existingIdx] = record;
+  } else {
+    record.createdBy = currentUser.name; record.createdAt = nowIso();
+    d.visits.push(record);
+  }
+  // Only one visit can be the final one
+  if(record.final) d.visits.forEach(x=>{ if(x.id!==record.id) x.final = false; });
+  dryingVisitDraft = null;
+  closeModal('modalDryingVisit');
+  commitScopeSheetChange(null, `${existingIdx>-1?'Edited':'Logged'} drying log visit for ${currentScopeSheet.jobName} (${fmtDateShort(record.date)})${record.final?' — FINAL':''}`, true);
+  showToast(record.final ? 'Final visit saved — drying log is ready to print' : 'Visit saved');
+}
+
+/* ---------------- Tables & graph (screen + print) ---------------- */
+function dryingDayLabels(visits){
+  return visits.map((v,i)=>{
+    const dt = new Date(v.date+'T00:00:00');
+    const md = `${dt.getMonth()+1}/${dt.getDate()}`;
+    return { title: v.final ? `Day ${i+1} / Final` : `Day ${i+1}`, date: md };
+  });
+}
+function chunk(arr, n){ const out=[]; for(let i=0;i<arr.length;i+=n) out.push(arr.slice(i,i+n)); return out; }
+function dryingMoistureTablesHtml(d){
+  const visits = sortedVisits(d);
+  if(!d.areas.length) return '<div class="empty">No monitoring areas yet.</div>';
+  const labels = dryingDayLabels(visits);
+  const idx = visits.map((_,i)=>i);
+  const groups = idx.length ? chunk(idx, DRYING_DAYS_PER_TABLE) : [[]];
+  return groups.map((g,gi)=>`
+    ${groups.length>1?`<div style="font-size:11px;font-weight:700;color:var(--muted);margin:${gi?10:0}px 0 4px;">${labels[g[0]].title} – ${labels[g[g.length-1]].title}</div>`:''}
+    <table class="report-table drying-table"><thead><tr><th style="text-align:left;width:30%;">Area / Location</th><th style="width:15%;">Dry goal</th>${g.map(i=>`<th style="text-align:center;">${labels[i].title}<br><span style="font-weight:500;font-size:10.5px;opacity:.85;">${labels[i].date}</span></th>`).join('')}</tr></thead>
+    <tbody>${d.areas.map(a=>`<tr>
+      <td><b>${escapeHtml(a.name)}</b>${a.location?`<div style="font-size:10.5px;color:#555E6B;">${escapeHtml(a.location)}</div>`:''}</td>
+      <td style="text-align:center;">${escapeHtml(fmtMC(a.dryStandard)||'—')}${a.standardSource?`<div style="font-size:9.5px;color:#555E6B;">${escapeHtml(a.standardSource)}</div>`:''}</td>
+      ${g.map(i=>{ const r = visits[i].readings ? visits[i].readings[a.id] : null; const ok = r!=null && atGoal(r, a.dryStandard);
+        return `<td style="text-align:center;${ok?'color:#1F7A4F;font-weight:700;':''}">${r!=null && String(r).trim()!=='' ? escapeHtml(fmtMC(r))+(ok?' ✓':'') : '—'}</td>`; }).join('')}
+    </tr>`).join('')}</tbody></table>`).join('');
+}
+function dryingAtmosTableHtml(d){
+  const visits = sortedVisits(d);
+  if(!visits.length) return '<div class="empty">No visits logged yet.</div>';
+  const hasUn = visits.some(v=>v.unaffected && v.unaffected.gpp!=null);
+  const hasOut = visits.some(v=>v.outside && v.outside.gpp!=null);
+  const cell = x => (x==null || x==='') ? '—' : escapeHtml(String(x));
+  return `<table class="report-table drying-table"><thead><tr>
+      <th style="text-align:left;">Date / Time</th><th>Temp</th><th>RH</th><th>GPP</th>${hasUn?'<th>Unaffected GPP</th>':''}${hasOut?'<th>Outside GPP</th>':''}<th>Dehus</th><th>Air movers</th><th>Air scrubbers</th><th style="text-align:left;">Equipment changes</th><th>Tech</th>
+    </tr></thead><tbody>${visits.map(v=>{ const af = v.affected||{};
+      const changes = [v.equipChanges, v.repositioned ? ('Repositioned' + (v.repositionNote?`: ${v.repositionNote}`:'')) : ''].filter(Boolean).join('; ');
+      return `<tr>
+        <td>${fmtDateShort(v.date).replace(/, \d{4}$/,'')}${v.time?`<div style="font-size:10px;color:#555E6B;">${escapeHtml(fmtTimeStr(v.time))}</div>`:''}</td>
+        <td style="text-align:center;">${af.tempF?escapeHtml(af.tempF)+'°F':'—'}</td><td style="text-align:center;">${af.rh?escapeHtml(af.rh)+'%':'—'}</td><td style="text-align:center;">${cell(af.gpp)}</td>
+        ${hasUn?`<td style="text-align:center;">${cell(v.unaffected&&v.unaffected.gpp)}</td>`:''}${hasOut?`<td style="text-align:center;">${cell(v.outside&&v.outside.gpp)}</td>`:''}
+        <td style="text-align:center;">${cell(v.dehus||'0')}</td><td style="text-align:center;">${cell(v.airMovers||'0')}</td><td style="text-align:center;">${cell(v.airScrubbers||'0')}</td>
+        <td style="font-size:10.5px;">${escapeHtml(changes||'—')}</td><td style="text-align:center;">${escapeHtml(v.initials||initialsOf(v.technician)||'—')}</td>
+      </tr>`; }).join('')}</tbody></table>`;
+}
+// One graph (or two, once there are more than 8 areas), styled after the
+// sample: soft colored lines, dots at each reading, legend underneath,
+// Day 1 ... Final along the bottom. A filled check marks the first reading
+// where each area reached its dry goal.
+function dryingChartsHtml(d){
+  const visits = sortedVisits(d);
+  const labels = dryingDayLabels(visits);
+  const series = d.areas.map(a=>({ a, pts: visits.map((v,i)=>({ i, v: v.readings ? parseMoistureValue(v.readings[a.id]) : null })).filter(p=>p.v!==null) }))
+    .filter(s=>s.pts.length>=2);
+  if(!series.length || visits.length<2) return '';
+  // Keep areas with the same room name together when splitting into charts
+  const byRoom = {};
+  series.forEach(s=>{ const k = s.a.name.trim().split(/\s+/)[0].toLowerCase(); (byRoom[k]=byRoom[k]||[]).push(s); });
+  const charts = [];
+  let cur = [];
+  Object.values(byRoom).forEach(grp=>{
+    if(cur.length && cur.length + grp.length > DRYING_MAX_SERIES_PER_CHART){ charts.push(cur); cur = []; }
+    cur = cur.concat(grp);
+    while(cur.length > DRYING_MAX_SERIES_PER_CHART){ charts.push(cur.slice(0,DRYING_MAX_SERIES_PER_CHART)); cur = cur.slice(DRYING_MAX_SERIES_PER_CHART); }
+  });
+  if(cur.length) charts.push(cur);
+  return charts.map((cs,ci)=>dryingChartSvg(cs, labels, charts.length>1 ? `Graph ${ci+1} of ${charts.length}` : '')).join('');
+}
+function dryingChartSvg(series, labels, caption){
+  const W=720, H=290, padL=46, padR=24, padT=16, padB=34;
+  const vals = series.flatMap(s=>s.pts.map(p=>p.v));
+  const maxV = Math.max(10, Math.ceil(Math.max(...vals)/10)*10);
+  const n = labels.length;
+  const xOf = i => n<=1 ? padL : padL + i*(W-padL-padR)/(n-1);
+  const yOf = v => padT + (1 - v/maxV)*(H-padT-padB);
+  let grid = '';
+  for(let v=0; v<=maxV; v+=10){
+    const y = yOf(v).toFixed(1);
+    grid += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#E6E9EE" stroke-width="1" stroke-dasharray="${v===0?'0':'4 4'}"/><text x="${padL-8}" y="${(+y+4).toFixed(1)}" font-size="12" fill="#5C6673" text-anchor="end">${v}%</text>`;
+  }
+  const xl = labels.map((l,i)=>`<text x="${xOf(i).toFixed(1)}" y="${H-padB+18}" font-size="12" fill="#5C6673" text-anchor="${i===0?'start':i===n-1?'end':'middle'}">${l.title}</text>`).join('');
+  const lines = series.map((s,k)=>{
+    const c = DRYING_CHART_COLORS[k % DRYING_CHART_COLORS.length];
+    const pts = s.pts.map(p=>`${xOf(p.i).toFixed(1)},${yOf(p.v).toFixed(1)}`).join(' ');
+    const goalIdx = s.pts.findIndex(p=>{ const g = parseMoistureValue(s.a.dryStandard); return g!==null && p.v<=g; });
+    const dots = s.pts.map((p,j)=>{
+      const x = xOf(p.i).toFixed(1), y = yOf(p.v).toFixed(1);
+      if(j===goalIdx) return `<circle cx="${x}" cy="${y}" r="7" fill="${c}"/><path d="M${(+x-3.2).toFixed(1)} ${y} l2.2 2.4 l4.4 -4.8" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+      return `<circle cx="${x}" cy="${y}" r="4" fill="${c}"/>`;
+    }).join('');
+    return `<polyline points="${pts}" fill="none" stroke="${c}" stroke-opacity=".55" stroke-width="2.5" stroke-linejoin="round"/>${dots}`;
+  }).join('');
+  const legend = series.map((s,k)=>`<span style="display:inline-flex;align-items:center;gap:6px;margin:0 9px 4px;font-size:12px;white-space:nowrap;"><span style="width:10px;height:10px;border-radius:50%;background:${DRYING_CHART_COLORS[k % DRYING_CHART_COLORS.length]};display:inline-block;"></span>${escapeHtml(s.a.name)}${s.a.location?` <span style="color:#5C6673;">(${escapeHtml(s.a.location)})</span>`:''}</span>`).join('');
+  return `<div class="drying-chart" style="margin:6px 0 12px;">
+    ${caption?`<div style="font-size:11px;font-weight:700;color:#5C6673;margin-bottom:2px;">${caption}</div>`:''}
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;">${grid}${lines}${xl}</svg>
+    <div style="text-align:center;margin-top:4px;">${legend}</div>
+    <div style="text-align:center;font-size:10.5px;color:#5C6673;margin-top:2px;">Filled check = area reached its dry goal</div>
+  </div>`;
+}
+
+/* ---------------- Printing ---------------- */
+function dryingInfoGrid(rows){
+  return `<table class="drying-info" style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px;">${chunk(rows,2).map(pair=>`<tr>${pair.map(([k,v])=>`<td style="padding:4px 8px;border:1px solid #C9D0D8;width:18%;background:#F1F3F5;font-weight:700;">${k}</td><td style="padding:4px 8px;border:1px solid #C9D0D8;width:32%;">${v}</td>`).join('')}${pair.length<2?'<td style="border:1px solid #C9D0D8;"></td><td style="border:1px solid #C9D0D8;"></td>':''}</tr>`).join('')}</table>`;
+}
+function buildDryingLogPrintHtml(s, opts){
+  opts = opts || {};
+  const d = getDrying(s);
+  const visits = sortedVisits(d);
+  const rooms = s.rooms || [];
+  const uniq = arr => [...new Set(arr.filter(Boolean))].join(', ');
+  const techs = uniq([...(s.technicians||'').split(',').map(x=>x.trim()), ...visits.map(v=>v.technician)]);
+  const finalV = visits.find(v=>v.final);
+  const info = dryingInfoGrid([
+    ['Customer / job', escapeHtml(s.jobName||'—')],
+    ['Property address', escapeHtml(s.propertyAddress||'—')],
+    ['Date of loss', d.dateOfLoss ? fmtDateShort(d.dateOfLoss) : '—'],
+    ['Claim number', escapeHtml(d.claimNumber||'—')],
+    ['Insurance carrier', escapeHtml(d.carrier||'—')],
+    ['Moisture meter', escapeHtml(d.meter||'—')],
+    ['Cause of loss', escapeHtml(uniq(rooms.map(r=>r.causeSource)) || s.lossDescription || '—')],
+    ['Category / class', escapeHtml([uniq(rooms.map(r=>r.waterCategory))&&('Cat '+uniq(rooms.map(r=>r.waterCategory))), uniq(rooms.map(r=>r.dryingClass))&&('Class '+uniq(rooms.map(r=>r.dryingClass)))].filter(Boolean).join(' / ') || '—')],
+    ['Monitoring', visits.length ? `${fmtDateShort(visits[0].date)} – ${fmtDateShort(visits[visits.length-1].date)} (${visits.length} visit${visits.length===1?'':'s'})` : '—'],
+    ['Technician(s)', escapeHtml(techs||'—')]
+  ]);
+  const notes = visits.filter(v=>v.notes);
+  const signoff = finalV ? `
+    <div class="drying-signoff" style="margin-top:14px;padding:10px 12px;border:1.5px solid #10202E;border-radius:6px;">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;margin-bottom:4px;">Final verification &mdash; ${fmtDateShort(finalV.date)}</div>
+      <div style="font-size:12px;white-space:pre-wrap;margin-bottom:10px;">${escapeHtml(finalV.finalNote || DRYING_DEFAULT_FINAL_NOTE)}</div>
+      <div style="display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;"><div style="min-height:54px;">${signatureSvg(finalV.signature, 54)}</div><div style="border-top:1px solid #10202E;font-size:10.5px;padding-top:2px;">Technician signature</div></div>
+        <div style="min-width:160px;"><div style="font-size:12.5px;font-weight:700;min-height:18px;">${escapeHtml(finalV.signedName||finalV.technician||'')}</div><div style="border-top:1px solid #10202E;font-size:10.5px;padding-top:2px;">Printed name</div></div>
+        <div style="min-width:120px;"><div style="font-size:12.5px;min-height:18px;">${finalV.signedAt ? new Date(finalV.signedAt).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : fmtDateShort(finalV.date)}</div><div style="border-top:1px solid #10202E;font-size:10.5px;padding-top:2px;">Date</div></div>
+      </div>
+    </div>` : `<div class="hint" style="margin-top:12px;">Drying in progress &mdash; no final verification yet.</div>`;
+  return `${reportLetterheadHtml(opts.title || 'Drying Log')}
+    ${opts.banner || ''}
+    ${info}
+    <div class="card-eyebrow" style="margin-top:10px;">Moisture readings by area</div>
+    ${dryingMoistureTablesHtml(d)}
+    <div class="card-eyebrow" style="margin-top:12px;">Atmospheric &amp; equipment log</div>
+    ${dryingAtmosTableHtml(d)}
+    <div class="card-eyebrow" style="margin-top:12px;">Drying progress</div>
+    ${dryingChartsHtml(d) || '<div class="empty">Not enough readings to graph yet.</div>'}
+    ${notes.length ? `<div class="card-eyebrow" style="margin-top:10px;">Daily notes</div>
+      <table class="report-table drying-table"><tbody>${notes.map(v=>`<tr><td style="width:90px;white-space:nowrap;">${fmtDateShort(v.date).replace(/, \d{4}$/,'')}${v.initials?` &middot; ${escapeHtml(v.initials)}`:''}</td><td>${escapeHtml(v.notes)}</td></tr>`).join('')}</tbody></table>` : ''}
+    ${signoff}
+    <div style="font-size:10.5px;color:#555E6B;margin-top:8px;">Photos and supporting moisture readings are kept in True Restore under this job.</div>`;
+}
+function printDryingLog(){
+  if(!currentScopeSheet) return;
+  const holder = document.createElement('div');
+  holder.innerHTML = buildDryingLogPrintHtml(currentScopeSheet);
+  printReportContent(holder, '');
+}
+// A blank paper version for when a phone dies or there's no signal: same
+// layout as the printed log, with empty boxes for 8 areas and 7 visits.
+function printBlankDryingForm(){
+  const blank = n => Array.from({length:n}, ()=> '<td style="height:30px;">&nbsp;</td>').join('');
+  const line = '<span style="display:inline-block;border-bottom:1px solid #10202E;min-width:100%;height:16px;"></span>';
+  const holder = document.createElement('div');
+  holder.innerHTML = `${reportLetterheadHtml('Drying Log &mdash; Field Form')}
+    ${dryingInfoGrid([['Customer / job',''],['Property address',''],['Date of loss',''],['Claim number',''],['Insurance carrier',''],['Moisture meter',''],['Cause of loss',''],['Category / class','']])}
+    <div class="card-eyebrow" style="margin-top:8px;">Moisture readings by area</div>
+    <table class="report-table drying-table blank-form"><thead><tr><th style="text-align:left;width:26%;">Area / Location (where on wall)</th><th style="width:9%;">Dry goal</th>${['Day 1','Day 2','Day 3','Day 4','Day 5','Day 6','Day 7 / Final'].map(t=>`<th>${t}<br><span style="font-weight:500;font-size:10px;">Date: ____</span></th>`).join('')}</tr></thead>
+      <tbody>${Array.from({length:8},()=>`<tr>${blank(9)}</tr>`).join('')}</tbody></table>
+    <div class="card-eyebrow" style="margin-top:10px;">Atmospheric &amp; equipment log</div>
+    <table class="report-table drying-table blank-form"><thead><tr><th>Date / Time</th><th>Temp</th><th>RH</th><th>GPP</th><th>Unaffected GPP</th><th>Outside GPP</th><th>Dehus</th><th>Air movers</th><th>Air scrubbers</th><th style="width:22%;">Equipment added / removed / moved</th><th>Initials</th></tr></thead>
+      <tbody>${Array.from({length:7},()=>`<tr>${blank(11)}</tr>`).join('')}</tbody></table>
+    <div class="card-eyebrow" style="margin-top:10px;">Daily notes</div>
+    ${Array.from({length:4},()=>`<div style="margin:12px 0;">${line}</div>`).join('')}
+    <div class="drying-signoff" style="margin-top:12px;padding:10px 12px;border:1.5px solid #10202E;border-radius:6px;">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px;">Final verification</div>
+      <div style="font-size:11.5px;margin-bottom:16px;">&#9744; All monitored areas at or below dry goal &nbsp;&nbsp; &#9744; Equipment removed &nbsp;&nbsp; &#9744; Final photos &amp; readings uploaded to True Restore</div>
+      <div style="display:flex;gap:24px;">
+        <div style="flex:2;border-top:1px solid #10202E;font-size:10.5px;padding-top:2px;margin-top:22px;">Technician signature</div>
+        <div style="flex:1;border-top:1px solid #10202E;font-size:10.5px;padding-top:2px;margin-top:22px;">Printed name</div>
+        <div style="flex:1;border-top:1px solid #10202E;font-size:10.5px;padding-top:2px;margin-top:22px;">Date</div>
+      </div>
+    </div>`;
+  printReportContent(holder, '');
+}
+// A fully filled-in example for training, using sample readings — clearly
+// marked as a sample so it can never be mistaken for a real job record.
+function printSampleDryingLog(){
+  const ids = ['S1','S2','S3','S4'];
+  const sample = {
+    jobName: 'SAMPLE — Jane Doe', propertyAddress: '123 Example St, Tucson, AZ', lossDescription: 'Supply line failure under kitchen sink',
+    technicians: 'Sample Technician', rooms: [{ causeSource:'Supply line failure under kitchen sink', waterCategory:'1', dryingClass:'2' }],
+    drying: {
+      dateOfLoss:'2026-09-24', claimNumber:'SAMPLE-0001', carrier:'Sample Insurance Co.', meter:'Pin-type moisture meter, % MC',
+      areas: [
+        { id:'S1', name:'Kitchen', location:'North wall, drywall, 6 in. above floor', dryStandard:'10', standardSource:'Unaffected drywall, dining room' },
+        { id:'S2', name:'Kitchen', location:'Base plate by sink', dryStandard:'12', standardSource:'Unaffected framing, pantry' },
+        { id:'S3', name:'Hall', location:'Drywall, lower section', dryStandard:'10', standardSource:'Unaffected drywall, bedroom 2' },
+        { id:'S4', name:'Hall', location:'Base plate', dryStandard:'12', standardSource:'Unaffected framing, bedroom 2' }
+      ],
+      visits: [
+        ['2026-09-25','09:15','78','61','46',['28','31','24','27'],'2','8','1','Equipment set. Cabinet toe kicks removed for airflow.',false],
+        ['2026-09-26','09:40','80','45','45',['21','24','18','21'],'2','8','1','Readings dropping in all areas.',false],
+        ['2026-09-27','10:05','79','36','46',['15','17','13','15'],'2','6','1','Removed 2 air movers from hall.',false],
+        ['2026-09-28','09:30','78','32','44',['10','12','9','11'],'1','4','0','',true]
+      ].map((r,i)=>({ id:'SV'+i, date:r[0], time:r[1], technician:'Sample Technician', initials:'ST',
+        affected:{ tempF:r[2], rh:r[3], gpp: gppOf(r[2],r[3]) }, unaffected:{ tempF:'76', rh:r[4], gpp: gppOf('76',r[4]) }, outside:{},
+        readings: Object.fromEntries(ids.map((id,j)=>[id, r[5][j]])), dehus:r[6], airMovers:r[7], airScrubbers:r[8], notes:r[9], final:r[10],
+        finalNote: DRYING_DEFAULT_FINAL_NOTE, signature: r[10] ? '40,110 60,70 75,105 90,60 105,108 125,80 150,95 175,70 200,100 240,85' : '', signedName: r[10]?'Sample Technician':'', signedAt: r[10]?'2026-09-28T16:45:00.000Z':'' }))
+    }
+  };
+  // Fill in equipment changes the same way a real visit does
+  const sv = sample.drying.visits;
+  sv.forEach((v,i)=>{ v.equipChanges = equipmentChangeText(i ? sv[i-1] : null, v); });
+  const holder = document.createElement('div');
+  holder.innerHTML = buildDryingLogPrintHtml(sample, {
+    title: 'Drying Log &mdash; SAMPLE (for training)',
+    banner: '<div style="border:2px dashed #B4232F;color:#B4232F;font-weight:800;text-align:center;padding:6px;margin-bottom:10px;border-radius:6px;">SAMPLE ONLY &mdash; example of a completed drying log. Not a real job.</div>'
+  });
   printReportContent(holder, '');
 }
 
@@ -3571,8 +4430,11 @@ function activeJobLog(){
 let pendingJobName = null;
 function startJob(){
   const input = document.getElementById('jobNameInput2');
-  const name = input ? input.value.trim() : '';
-  if(!name){ showToast('Enter or choose a job name'); return; }
+  const typed = input ? input.value.trim() : '';
+  if(!typed){ showToast('Choose a job from the list'); return; }
+  const name = officialJobName(typed, pinnedJobLabelsForCurrentUser());
+  if(!name){ showToast(`"${typed}" isn't on the job list — pick it from the list, or ask an admin to add it`); renderJobSearchResults(typed); return; }
+  input.value = name;
   askConfirmJob(name);
 }
 function askConfirmJob(name){
@@ -3684,7 +4546,7 @@ function clockOut(){
 function jobLogRowsHtml(){
   if(todayEntry.jobLogs.length===0) return '';
   const rows = todayEntry.jobLogs.map(jl=>{
-    const dur = fmtDuration(new Date(jl.endedAt||nowIso()) - new Date(jl.startedAt));
+    const dur = fmtClock(new Date(jl.endedAt||nowIso()) - new Date(jl.startedAt));
     return `<div class="log-item">
       <div><div class="nm">${escapeHtml(jl.jobName)}</div><div class="tm">${fmtTime(jl.startedAt)} &ndash; ${jl.endedAt? fmtTime(jl.endedAt) : 'now'}</div></div>
       <div class="dur">${dur}</div>
@@ -3722,7 +4584,11 @@ function renderJobSearchResults(query){
   matches.slice(0,25).forEach(n=>{
     rows.push(`<div class="jsr-row" onclick="selectJobSearchResult('${escapeHtml(n).replace(/'/g,"\\'")}')">${escapeHtml(n)}</div>`);
   });
-  if(rows.length===0){ box.classList.remove('show'); return; }
+  if(rows.length===0){
+    box.innerHTML = q ? `<div class="jsr-row" style="color:var(--muted);cursor:default;">No job matches "${escapeHtml(query.trim())}". Check the spelling, or ask an admin to add it to the job list.</div>` : '';
+    if(q) box.classList.add('show'); else box.classList.remove('show');
+    return;
+  }
   box.innerHTML = rows.join('');
   box.classList.add('show');
 }
@@ -3780,7 +4646,7 @@ function renderToday(){
   if(currentShift.clockOutAt){
     pill.textContent = 'Clocked out';
     pill.className = 'status-pill off';
-    const total = fmtDuration(entryHoursMs(todayEntry));
+    const total = fmtClock(entryHoursMs(todayEntry));
     const shiftRows = shifts.map((s,i)=>`
       <div class="summary-box"><div class="l">Shift ${i+1}</div><div class="v" style="font-size:14px;">${fmtTime(s.clockInAt)} &ndash; ${s.clockOutAt?fmtTime(s.clockOutAt):'—'}</div></div>`).join('');
     const lunchRows = (todayEntry.lunchLog||[]).map((l,i)=>`
@@ -3839,7 +4705,7 @@ function renderToday(){
     if(active && active.jobName.trim().toLowerCase()===ADMIN_JOB_LABEL.toLowerCase()){
       pill.textContent = 'On the clock';
       pill.className = 'status-pill on';
-      const elapsed = fmtDuration(new Date() - new Date(active.startedAt));
+      const elapsed = fmtClock(new Date() - new Date(active.startedAt));
       el.innerHTML = `
         <div class="card" style="text-align:center;">
           <div class="timer-box">
@@ -3855,7 +4721,7 @@ function renderToday(){
     if(active){
       pill.textContent = 'On the clock';
       pill.className = 'status-pill on';
-      const elapsed = fmtDuration(new Date() - new Date(active.startedAt));
+      const elapsed = fmtClock(new Date() - new Date(active.startedAt));
       el.innerHTML = `
         <div class="card">
           <div class="card-eyebrow">Vehicle: ${escapeHtml(todayEntry.vehicle)}</div>
@@ -3866,7 +4732,7 @@ function renderToday(){
           </div>
           <div class="field" style="margin-bottom:10px;position:relative;">
             <label>Next job</label>
-            <input id="jobNameInput2" placeholder="Search or type a job name" autocomplete="off" oninput="renderJobSearchResults(this.value)" onfocus="renderJobSearchResults(this.value)">
+            <input id="jobNameInput2" placeholder="Search for a job" autocomplete="off" oninput="renderJobSearchResults(this.value)" onfocus="renderJobSearchResults(this.value)">
             <div id="jobSearchResults" class="job-search-results"></div>
           </div>
           <div class="btn-row">
@@ -3886,7 +4752,7 @@ function renderToday(){
           <div class="card-sub">Log the job before you leave — this starts the timer for travel and time on site.</div>
           <div class="field" style="position:relative;">
             <label>Job name</label>
-            <input id="jobNameInput2" placeholder="Search or type a job name" autocomplete="off" oninput="renderJobSearchResults(this.value)" onfocus="renderJobSearchResults(this.value)">
+            <input id="jobNameInput2" placeholder="Search for a job" autocomplete="off" oninput="renderJobSearchResults(this.value)" onfocus="renderJobSearchResults(this.value)">
             <div id="jobSearchResults" class="job-search-results"></div>
           </div>
           <div class="btn-row">
@@ -3941,7 +4807,7 @@ function renderToday(){
   // 5. Ready to clock out
   pill.textContent = 'Ready to clock out';
   pill.className = 'status-pill warn';
-  const soFar = fmtDuration(entryHoursMs(todayEntry));
+  const soFar = fmtClock(entryHoursMs(todayEntry));
   const adminTitle = isAdminTitle(todayEntry.employeeName);
   el.innerHTML = `
     <div class="card" style="text-align:center;">
@@ -4670,8 +5536,9 @@ function addAdjustJobLog(){
   const input = document.getElementById('adjustNewJobName');
   const typed = (input.value||'').trim();
   if(!typed){ showToast('Type or pick a job name'); return; }
-  const known = [...PINNED_JOB_LABELS, PRINTING_JOB_LABEL, ...allJobNames()].find(n=>n.toLowerCase()===typed.toLowerCase());
-  const name = known || typed;
+  const known = officialJobName(typed, [...PINNED_JOB_LABELS, PRINTING_JOB_LABEL]);
+  if(!known){ showToast(`"${typed}" isn't on the job list — pick one from the list`); return; }
+  const name = known;
   const firstShift = adjustDraft.shifts.find(sh=>sh.clockInAt) || null;
   const lastJob = adjustDraft.jobLogs[adjustDraft.jobLogs.length-1];
   const lastShift = [...adjustDraft.shifts].reverse().find(sh=>sh.clockOutAt) || null;
@@ -4680,7 +5547,6 @@ function addAdjustJobLog(){
   adjustDraft.jobLogs.push({ id: uid('JL'), jobName: name, jobId: jobTrackerMap[name.toLowerCase()] || null, startedAt: start, endedAt: end });
   normalizeAdjustDraftDates();
   renderAdjustForm();
-  if(!known) showToast(`"${name}" isn't on the Job Tracker list, so its hours won't be sent to a job`);
 }
 function addAdjustShift(){
   adjustDraft.shifts.push({ clockInAt: null, clockOutAt: null });
