@@ -355,6 +355,9 @@ main.content{padding:16px 14px 4px;}
   #printRoot .payroll-page .payroll-totals{ margin-top:5px !important; }
   #printRoot .payroll-page .payroll-totals td{ padding:4px 7px; font-size:9pt; }
   #printRoot .scope-print-room{ break-inside:avoid; page-break-inside:avoid; }
+  #printRoot table.print-wide{ table-layout:auto; }
+  #printRoot table.print-wide th, #printRoot table.print-wide td{ font-size:7.8pt !important; padding:3px 3px !important; white-space:normal !important; }
+  #printRoot table.print-wide th{ font-size:7.4pt !important; }
   #printRoot .drying-table th, #printRoot .drying-table td{ font-size:8.5pt; padding:3px 5px; }
   #printRoot .drying-table th{ white-space:normal; }
   #printRoot .blank-form td{ height:24px; border:1px solid #9AA3AD !important; background:#fff !important; }
@@ -957,7 +960,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-10-09T15-00";
+const BUILD_ID = "2026-10-09T15-10";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -2635,11 +2638,12 @@ function printReportContent(contentNode, filtersHtml){
   root.innerHTML = '';
   root.appendChild(clone);
   // Landscape for wide tables so every column fits legibly
-  let maxCols = 0;
-  clone.querySelectorAll('table').forEach(t=>{ const r = t.querySelector('tr'); if(r) maxCols = Math.max(maxCols, r.children.length); });
+  // Every report prints portrait (saves paper). Wide tables (7+ columns)
+  // get a compact print style so all their columns still fit the page.
+  clone.querySelectorAll('table').forEach(t=>{ const r = t.querySelector('tr'); if(r && r.children.length >= 7) t.classList.add('print-wide'); });
   let pageStyle = document.getElementById('printPageStyle');
   if(!pageStyle){ pageStyle = document.createElement('style'); pageStyle.id = 'printPageStyle'; document.head.appendChild(pageStyle); }
-  pageStyle.textContent = maxCols >= 7 ? '@page{ size: letter landscape; margin: 0.45in; }' : '@page{ size: letter portrait; margin: 0.5in; }';
+  pageStyle.textContent = '@page{ size: letter portrait; margin: 0.45in; }';
   document.body.classList.add('printing-report');
   // The print copy stays ready (and the page stays in report mode for
   // printing) until the next tap anywhere — iPhones sometimes ask "Allow
