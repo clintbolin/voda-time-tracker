@@ -300,6 +300,10 @@ main.content{padding:16px 14px 4px;}
 .report-letterhead .rl-date{font-size:11px;color:var(--muted);margin-top:2px;}
 
 .drying-table th, .drying-table td{ font-size:12px; }
+.seg-toggle{ display:flex; border:1.5px solid var(--line); border-radius:10px; overflow:hidden; }
+.seg-toggle button{ flex:1; border:none; background:transparent; padding:11px 8px; font-size:14px; font-weight:700; color:var(--muted); font-family:inherit; cursor:pointer; }
+.seg-toggle button.on{ background:var(--gold); color:#1a1200; }
+.job-condensed tr.job-subtotal td{ border-bottom:2px solid var(--line); background:var(--gray-bg); }
 /* Phone screens: keep every report column (including Total) visible.
    Tighter cells, and any table still too wide scrolls sideways inside the
    report instead of getting cut off. */
@@ -356,6 +360,9 @@ main.content{padding:16px 14px 4px;}
   #printRoot .payroll-page .payroll-totals td{ padding:4px 7px; font-size:9pt; }
   #printRoot .scope-print-room{ break-inside:avoid; page-break-inside:avoid; }
   #printRoot table.print-wide{ table-layout:auto; }
+  #printRoot .job-condensed td, #printRoot .job-condensed th{ padding:3px 8px; font-size:9.5pt; }
+  #printRoot .job-condensed tr.job-subtotal td{ border-bottom:1.5px solid #10202E; background:#F1F3F5 !important; }
+  #printRoot .job-report-section{ break-inside:avoid-page; }
   #printRoot table.print-wide th, #printRoot table.print-wide td{ font-size:7.8pt !important; padding:3px 3px !important; white-space:normal !important; }
   #printRoot table.print-wide th{ font-size:7.4pt !important; }
   #printRoot .drying-table th, #printRoot .drying-table td{ font-size:8.5pt; padding:3px 5px; }
@@ -727,15 +734,20 @@ main.content{padding:16px 14px 4px;}
 <div class="overlay" id="modalJobReport"><div class="sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-head">
-    <div><div class="sheet-title">Job report</div><div class="sheet-sub">Everyone who worked a job, with dates &amp; times</div></div>
+    <div><div class="sheet-title">Job report</div><div class="sheet-sub">Who worked each job &mdash; full detail or condensed totals</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalJobReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
   <div class="field"><label>Job name</label>
-    <input id="jobReportName" list="jobReportNameList" placeholder="Type or choose a job" oninput="renderJobReport()">
-    <datalist id="jobReportNameList"></datalist>
+    <select id="jobReportName" onchange="renderJobReport()"></select>
+  </div>
+  <div class="field"><label>Report style</label>
+    <div class="seg-toggle" id="jobReportModeToggle">
+      <button type="button" data-mode="full" onclick="setJobReportMode('full')">Full</button>
+      <button type="button" data-mode="condensed" onclick="setJobReportMode('condensed')">Condensed</button>
+    </div>
   </div>
   <div style="display:flex;gap:8px;">
     <div class="field" style="flex:1;"><label>From</label><input type="date" id="jobReportFrom" onchange="renderJobReport()"></div>
@@ -960,7 +972,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-10-09T15-10";
+const BUILD_ID = "2026-10-16T17-50";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -5327,23 +5339,32 @@ function renderDetailedLaborReport(){
     <div class="hint" style="margin-top:14px;font-weight:700;color:var(--ink);">Grand total (${fmtDateShort(from)} \u2013 ${fmtDateShort(to)}): ${fmtDuration(grandTotalMs)} &mdash; $${grandTotalCost.toFixed(2)}</div>`;
 }
 
+const JOB_REPORT_ALL = '__ALL_JOBS__';
+let jobReportMode = 'full';
 function openJobReport(){
-  document.getElementById('jobReportNameList').innerHTML = allJobNames().map(n=>`<option value="${escapeHtml(n)}">`).join('');
+  // Every job on the list, plus anything (Meeting, Cleanings, Printing...)
+  // that has time logged against it
+  const names = new Map();
+  [...allJobNames(), ...PINNED_JOB_LABELS, PRINTING_JOB_LABEL].forEach(n=>names.set(n.toLowerCase(), n));
+  entries.forEach(e=>(e.jobLogs||[]).forEach(jl=>{ const k = (jl.jobName||'').trim().toLowerCase(); if(k && !names.has(k)) names.set(k, jl.jobName.trim()); }));
+  const sorted = [...names.values()].sort((a,b)=>a.localeCompare(b));
+  document.getElementById('jobReportName').innerHTML = `<option value="">— Choose a job —</option><option value="${JOB_REPORT_ALL}">All jobs</option>` + sorted.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
   document.getElementById('jobReportName').value = '';
   const to = todayStr();
   document.getElementById('jobReportFrom').value = addDays(to, -13);
   document.getElementById('jobReportTo').value = to;
-  document.getElementById('jobReportBody').innerHTML = `<div class="empty">Choose a job to see who worked it.</div>`;
+  setJobReportMode('full', true);
+  renderJobReport();
   openModal('modalJobReport');
 }
-function renderJobReport(){
-  const jobName = document.getElementById('jobReportName').value.trim();
-  const from = document.getElementById('jobReportFrom').value;
-  const to = document.getElementById('jobReportTo').value;
-  const wrap = document.getElementById('jobReportBody');
-  if(!jobName){ wrap.innerHTML = `<div class="empty">Choose a job to see who worked it.</div>`; return; }
-  const letterhead = reportLetterheadHtml(`Job Report &mdash; ${escapeHtml(jobName)}`);
-  let sessionRows = [];
+function setJobReportMode(mode, skipRender){
+  jobReportMode = mode==='condensed' ? 'condensed' : 'full';
+  document.querySelectorAll('#jobReportModeToggle button').forEach(b=>b.classList.toggle('on', b.dataset.mode===jobReportMode));
+  if(!skipRender) renderJobReport();
+}
+// Everything logged against one job in the date range
+function jobReportData(jobName, from, to){
+  const sessionRows = [];
   const perEmp = {}; // name -> { totalMs, unsyncedMs, unsyncedCost, jobId }
   let grandTotal = 0;
   entries.forEach(e=>{
@@ -5369,15 +5390,17 @@ function renderJobReport(){
       grandTotal += ms;
     });
   });
-  if(sessionRows.length===0){ wrap.innerHTML = letterhead + `<div class="empty">No one has logged time on "${escapeHtml(jobName)}" in this range.</div>`; return; }
   sessionRows.sort((a,b)=> a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+  return { sessionRows, perEmp, grandTotal, empNames: Object.keys(perEmp).sort((a,b)=>a.localeCompare(b)) };
+}
+// FULL view for one job — exactly the original Job report layout
+function jobReportFullHtml(jobName, d, from, to){
   const sessionsTable = `<table class="report-table"><thead><tr><th>Date</th><th>Employee</th><th>Start</th><th>End</th><th>Hours</th><th>Sent?</th></tr></thead><tbody>
-    ${sessionRows.map(r=>`<tr><td>${fmtDateShort(r.date)}</td><td>${escapeHtml(r.name)}</td><td>${fmtTime(r.start)}</td><td>${r.end?fmtTime(r.end):'In progress'}</td><td>${fmtDuration(r.ms)}</td><td>${r.synced?'✅':'—'}</td></tr>`).join('')}
+    ${d.sessionRows.map(r=>`<tr><td>${fmtDateShort(r.date)}</td><td>${escapeHtml(r.name)}</td><td>${fmtTime(r.start)}</td><td>${r.end?fmtTime(r.end):'In progress'}</td><td>${fmtDuration(r.ms)}</td><td>${r.synced?'✅':'—'}</td></tr>`).join('')}
   </tbody></table>`;
-  const empNames = Object.keys(perEmp).sort((a,b)=>a.localeCompare(b));
   const perEmpTable = `<table class="report-table"><thead><tr><th>Employee</th><th>Total</th><th>Not yet sent</th><th></th></tr></thead><tbody>
-    ${empNames.map(n=>{
-      const row = perEmp[n];
+    ${d.empNames.map(n=>{
+      const row = d.perEmp[n];
       let sendBtn;
       if(row.unsyncedMs===0) sendBtn = `<span style="color:var(--muted);font-size:11.5px;">All sent</span>`;
       else if(!row.jobId) sendBtn = `<span style="color:var(--muted);font-size:11.5px;">Not a Job Tracker job</span>`;
@@ -5385,13 +5408,65 @@ function renderJobReport(){
       return `<tr><td>${escapeHtml(n)}</td><td>${fmtDuration(row.totalMs)}</td><td>${row.unsyncedMs>0?fmtDuration(row.unsyncedMs):'—'}</td><td>${sendBtn}</td></tr>`;
     }).join('')}
   </tbody></table>`;
-  wrap.innerHTML = `${letterhead}
-    <div class="card-eyebrow">Sessions (${fmtDateShort(from)} \u2013 ${fmtDateShort(to)})</div>
+  return `<div class="card-eyebrow">Sessions (${fmtDateShort(from)} – ${fmtDateShort(to)})</div>
     ${sessionsTable}
     <div class="card-eyebrow" style="margin-top:16px;">Total per employee &amp; send to Job Tracker</div>
     ${perEmpTable}
-    <div class="hint" style="margin-top:12px;font-weight:700;color:var(--ink);">Grand total (all employees): ${fmtDuration(grandTotal)}</div>
-    <div class="hint">Hours normally go to Job Tracker once a week through Reports &rarr; Weekly labor approval. The Send button here is only a backup for a single employee and job.</div>`;
+    <div class="hint" style="margin-top:12px;font-weight:700;color:var(--ink);">Grand total (all employees): ${fmtDuration(d.grandTotal)}</div>`;
+}
+// CONDENSED rows for one job: just each employee's total
+function jobReportCondensedRows(jobName, d, showJob){
+  return d.empNames.map((n,i)=>`<tr>${showJob?`<td>${i===0?`<b>${escapeHtml(jobName)}</b>`:''}</td>`:''}<td>${escapeHtml(n)}</td><td style="text-align:right;">${fmtDuration(d.perEmp[n].totalMs)}</td></tr>`).join('')
+    + `<tr class="job-subtotal">${showJob?'<td></td>':''}<td style="text-align:right;font-weight:700;">${showJob?'Job total':'Total'}</td><td style="text-align:right;font-weight:800;">${fmtDuration(d.grandTotal)}</td></tr>`;
+}
+function renderJobReport(){
+  const jobName = document.getElementById('jobReportName').value.trim();
+  const from = document.getElementById('jobReportFrom').value;
+  const to = document.getElementById('jobReportTo').value;
+  const wrap = document.getElementById('jobReportBody');
+  if(!jobName){ wrap.innerHTML = `<div class="empty">Choose a job — or "All jobs" — to see who worked it.</div>`; return; }
+  const condensed = jobReportMode==='condensed';
+  const range = `${fmtDateShort(from)} – ${fmtDateShort(to)}`;
+  const all = jobName===JOB_REPORT_ALL;
+  // Which jobs to include
+  let jobs;
+  if(all){
+    const seen = new Map();
+    entries.forEach(e=>{
+      if(from && e.date<from) return;
+      if(to && e.date>to) return;
+      (e.jobLogs||[]).forEach(jl=>{ const k = (jl.jobName||'').trim().toLowerCase(); if(k && !seen.has(k)) seen.set(k, officialJobName(jl.jobName, [...PINNED_JOB_LABELS, PRINTING_JOB_LABEL]) || jl.jobName.trim()); });
+    });
+    jobs = [...seen.values()].sort((a,b)=>a.localeCompare(b));
+  } else {
+    jobs = [jobName];
+  }
+  const title = `${all ? 'Job Report &mdash; All Jobs' : `Job Report &mdash; ${escapeHtml(jobName)}`}${condensed ? ' (Condensed)' : ''}`;
+  const letterhead = reportLetterheadHtml(title);
+  const data = jobs.map(j=>({ job:j, d: jobReportData(j, from, to) })).filter(x=>x.d.sessionRows.length);
+  if(!data.length){
+    wrap.innerHTML = letterhead + `<div class="empty">${all ? 'No time was logged to any job' : `No one has logged time on "${escapeHtml(jobName)}"`} in this range.</div>`;
+    return;
+  }
+  const grandAll = data.reduce((s,x)=>s+x.d.grandTotal,0);
+  const backupNote = `<div class="hint">Hours normally go to Job Tracker once a week through Reports &rarr; Weekly labor approval. The Send button here is only a backup for a single employee and job.</div>`;
+  if(condensed){
+    wrap.innerHTML = `${letterhead}
+      <div class="card-eyebrow">Total hours per employee${all ? ', by job' : ''} (${range})</div>
+      <table class="report-table job-condensed"><thead><tr>${all?'<th>Job</th>':''}<th>Employee</th><th style="text-align:right;">Hours</th></tr></thead>
+        <tbody>${data.map(x=>jobReportCondensedRows(x.job, x.d, all)).join('')}</tbody></table>
+      ${all ? `<div class="hint" style="margin-top:12px;font-weight:700;color:var(--ink);">Grand total, all jobs (${data.length} job${data.length===1?'':'s'}): ${fmtDuration(grandAll)}</div>` : ''}`;
+    return;
+  }
+  if(!all){
+    wrap.innerHTML = letterhead + jobReportFullHtml(jobName, data[0].d, from, to) + backupNote;
+    return;
+  }
+  wrap.innerHTML = `${letterhead}
+    <div class="hint" style="margin-top:0;">${data.length} job${data.length===1?'':'s'} with time logged, ${range}.</div>
+    ${data.map(x=>`<div class="job-report-section"><div style="font-size:17px;font-weight:800;margin:18px 0 6px;padding-top:10px;border-top:2px solid var(--black);">${escapeHtml(x.job)}</div>${jobReportFullHtml(x.job, x.d, from, to)}</div>`).join('')}
+    <div class="hint" style="margin-top:16px;font-weight:800;color:var(--ink);font-size:14px;">Grand total, all jobs: ${fmtDuration(grandAll)}</div>
+    ${backupNote}`;
 }
 async function sendLaborToJobTracker(employeeName, jobName, jobId, unsyncedMs, amount){
   if(!jobId){ showToast("This job isn't linked to Job Tracker"); return; }
