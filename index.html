@@ -467,6 +467,10 @@ main.content{padding:16px 14px 4px;}
     </div>
   </div>
   <div id="jobNameList"></div>
+  <div class="card-eyebrow" style="margin-top:18px;">Bring back an older job</div>
+  <div class="hint" style="margin-top:0;">Job Tracker jobs leave the list 90 days after landing. If the crew needs to go back to an older job (a callback, a delayed claim), find it here and bring it back. It stays on the list until you remove it.</div>
+  <div class="field"><input id="olderJobSearch" placeholder="Search older jobs by customer name" autocomplete="off" oninput="renderOlderJobs()"></div>
+  <div id="olderJobList"></div>
 </div></div>
 
 <!-- Manage Employees -->
@@ -584,7 +588,7 @@ main.content{padding:16px 14px 4px;}
     <div class="help-h"><span class="num">4</span>Vehicles, job list &amp; sync</div>
     <div class="help-bullet">Add or remove vehicles from the Pre-Trip list</div>
     <div class="help-bullet">Manually add jobs that aren't pulled from Job Tracker</div>
-    <div class="help-bullet">Job Tracker jobs drop off the list automatically 60 days after landing</div>
+    <div class="help-bullet">Job Tracker jobs drop off the list automatically 90 days after landing. For a callback on an older job, use Manage Job List &rarr; "Bring back an older job"</div>
     <div class="help-bullet">Hours go to Job Tracker <b>once a week</b>, after you approve them: Reports &rarr; Weekly labor approval. Each Monday the Bi-Weekly crew's week is ready, and each Friday the Weekly crew's. You'll see a gold banner until it's done.</div>
     <div class="help-bullet">Each job gets one line per employee for the week, with overtime blended in. If hours are fixed after a week was sent, that week comes back with just the difference as an adjustment.</div>
   </div>
@@ -972,7 +976,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-10-16T17-50";
+const BUILD_ID = "2026-10-19T14-00";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -1705,7 +1709,12 @@ function openReportsHub(){
 /* ============ JOB TRACKER INTEGRATION ============ */
 let jobTrackerMap = {}; // customerName (lowercased) -> Job Tracker job id
 let calendarJobs = []; // { id, customerName, landedDate, status } — for the Job Calendar
-const JOB_LIST_MAX_AGE_DAYS = 60; // jobs drop off the picker this many days after landing
+const JOB_LIST_MAX_AGE_DAYS = 90; // jobs drop off the picker this many days after landing
+// Older jobs an admin brought back by hand (Manage Job List -> "Bring back
+// an older job") stay on the list no matter their age. Their Job Tracker
+// ids are kept in settings.keepJobIds.
+let olderJobTrackerJobs = []; // landed jobs past the cutoff, for the "bring back" search
+function keptJobIds(){ return Array.isArray(settings.keepJobIds) ? settings.keepJobIds : []; }
 // Mirrors Job Tracker's own phase checklist just enough to read it —
 // "Mitigation truly finished" means Billing is checked, full stop, whether
 // or not this job has a Reconstruction side. Deliberately NOT using
@@ -1737,10 +1746,12 @@ async function fetchJobTrackerNames(){
     const data = await res.json();
     // Only jobs that have actually landed (won) — Pipeline/Lost jobs would
     // just clutter the dropdown with places nobody should be driving to yet.
-    // Also drop off automatically 60 days after landing, so the list doesn't
+    // Also drop off automatically 90 days after landing, so the list doesn't
     // grow forever across years of jobs — this is re-checked live on every
     // load, so nothing needs a stored timer.
     const cutoff = Date.now() - JOB_LIST_MAX_AGE_DAYS*86400000;
+    const keep = new Set(keptJobIds());
+    const older = [];
     const landed = (data.jobs||[]).filter(j=>{
       if(j.archived) return false;
       const mit = j.scopes && j.scopes.mitigation;
@@ -1750,8 +1761,12 @@ async function fetchJobTrackerNames(){
       if(!mitLanded && !reconLanded) return false;
       const landedAt = mitLanded ? mit.landedAt : recon.landedAt;
       if(!landedAt) return true; // no landed date on record — don't hide a valid job over missing data
-      return new Date(landedAt).getTime() >= cutoff;
+      if(keep.has(j.id)) return true; // brought back by hand
+      if(new Date(landedAt).getTime() >= cutoff) return true;
+      if(j.customerName) older.push({ id: j.id, customerName: j.customerName, landedAt });
+      return false;
     });
+    olderJobTrackerJobs = older.sort((a,b)=>b.landedAt.localeCompare(a.landedAt));
     jobTrackerNames = landed.map(j=>j.customerName).filter(Boolean);
     jobTrackerMap = {};
     landed.forEach(j=>{ if(j.customerName) jobTrackerMap[j.customerName.toLowerCase()] = j.id; });
@@ -5852,7 +5867,46 @@ async function removeVehicle(name){
 function openManageJobs(){
   renderJobNameList();
   document.getElementById('jobNameInput').value = '';
+  document.getElementById('olderJobSearch').value = '';
+  renderOlderJobs();
   openModal('modalJobs');
+}
+function renderOlderJobs(){
+  const wrap = document.getElementById('olderJobList');
+  if(!wrap) return;
+  const q = (document.getElementById('olderJobSearch').value||'').trim().toLowerCase();
+  const kept = keptJobIds();
+  // Jobs already brought back, so they can be removed again later
+  const keptRows = kept.map(id=>{
+    const name = Object.keys(jobTrackerMap).find(k=>jobTrackerMap[k]===id);
+    const display = name ? jobTrackerNames.find(n=>n.toLowerCase()===name) || name : null;
+    if(!display) return '';
+    return `<div class="list-row"><div><div class="nm">${escapeHtml(display)}</div><div style="font-size:11.5px;color:var(--green);font-weight:700;">Brought back &mdash; on the job list</div></div>
+      <button class="chip-sm" style="cursor:pointer;" onclick="setKeepOlderJob('${id}', false)">Remove</button></div>`;
+  }).join('');
+  let results = '';
+  if(q){
+    const matches = olderJobTrackerJobs.filter(j=>j.customerName.toLowerCase().includes(q)).slice(0,10);
+    results = matches.length ? matches.map(j=>`<div class="list-row"><div><div class="nm">${escapeHtml(j.customerName)}</div><div style="font-size:11.5px;color:var(--muted);">Landed ${fmtDateShort(j.landedAt.slice(0,10))}</div></div>
+      <button class="chip-sm" style="cursor:pointer;background:var(--gold);color:#1a1200;" onclick="setKeepOlderJob('${j.id}', true)">Bring back</button></div>`).join('')
+      : `<div class="empty">No older job matches "${escapeHtml(q)}". Jobs from the last 90 days are already on the list.</div>`;
+  }
+  wrap.innerHTML = keptRows + results;
+}
+async function setKeepOlderJob(jobId, keepIt){
+  const before = keptJobIds();
+  const next = keepIt ? [...new Set([...before, jobId])] : before.filter(x=>x!==jobId);
+  const job = olderJobTrackerJobs.find(j=>j.id===jobId);
+  settings.keepJobIds = next;
+  try{
+    const res = await apiPost('saveSettings', settings);
+    if(!res || !res.ok){ settings.keepJobIds = before; showToast('Save failed — backend rejected the update'); return; }
+  }catch(e){ settings.keepJobIds = before; showToast('Save failed — check your connection'); return; }
+  await fetchJobTrackerNames();
+  document.getElementById('olderJobSearch').value = '';
+  renderOlderJobs();
+  logAudit('Job list', todayStr(), [keepIt ? `Brought back older job "${job ? job.customerName : jobId}"` : `Removed brought-back job from the list`]);
+  showToast(keepIt ? `${job ? job.customerName : 'Job'} is back on the job list` : 'Removed from the job list');
 }
 function renderJobNameList(){
   const wrap = document.getElementById('jobNameList');
