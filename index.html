@@ -432,6 +432,7 @@ main.content{padding:16px 14px 4px;}
 
   <main class="content">
     <div class="signed-in-banner" id="myUnresolvedBanner" style="display:none;background:var(--red);color:#fff;font-weight:700;"></div>
+    <div class="signed-in-banner" id="pendingSaveBanner" style="display:none;background:#E9B824;color:#1a1200;font-weight:700;cursor:pointer;" onclick="flushPendingEntrySaves();showToast('Trying to save now…')"></div>
     <div class="signed-in-banner" id="laborApprovalBanner" style="display:none;background:var(--gold);color:#1a1200;font-weight:700;cursor:pointer;margin-bottom:12px;" onclick="openLaborApproval()"></div>
     <div id="todayContent"></div>
     <div class="quote-box" id="quoteBox"></div>
@@ -981,7 +982,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-11-05T14-30";
+const BUILD_ID = "2026-11-05T15-30";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -1155,7 +1156,8 @@ async function loadInitialData(){
   if(!BACKEND_READY){ renderSetupScreen(); return; }
   try{
     const data = await apiGetAll();
-    entries = data.entries || [];
+    entries = overlayPendingEntries(data.entries || []);
+    setTimeout(()=>{ renderPendingSaveBanner(); flushPendingEntrySaves(); }, 1500);
     vehicles = (data.vehicles && data.vehicles.length) ? data.vehicles : [...DEFAULT_VEHICLES];
     jobNameList = data.jobNames || [];
     employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, jobTitle:e.jobTitle||'Operations', perms:{...e.perms} }));
@@ -1388,7 +1390,7 @@ function selectEmployee(name, skipLoad){
 async function refreshDataFromServer(){
   try{
     const data = await apiGetAll();
-    if(data.entries) entries = data.entries;
+    if(data.entries) entries = overlayPendingEntries(data.entries);
     if(data.employees && data.employees.length) employees = data.employees;
     if(data.settings && data.settings.loginPin) settings = data.settings;
     if(data.auditLog) auditLog = data.auditLog;
@@ -2901,7 +2903,8 @@ async function loadData(){
   if(!BACKEND_READY){ renderSetupScreen(); return; }
   try{
     const data = await apiGetAll();
-    entries = data.entries || [];
+    entries = overlayPendingEntries(data.entries || []);
+    setTimeout(()=>{ renderPendingSaveBanner(); flushPendingEntrySaves(); }, 1500);
     vehicles = (data.vehicles && data.vehicles.length) ? data.vehicles : [...DEFAULT_VEHICLES];
     jobNameList = data.jobNames || [];
     employees = (data.employees && data.employees.length) ? data.employees : DEFAULT_EMPLOYEES.map(e=>({ name:e.name, hourlyRate:e.hourlyRate||0, jobTitle:e.jobTitle||'Operations', perms:{...e.perms} }));
@@ -2955,47 +2958,152 @@ function refreshOpenReports(){
   const la = document.getElementById('modalLaborApproval');
   if(la && la.classList.contains('active') && !laborApprovalSending) renderLaborApproval();
 }
-async function saveEntriesMerged(entriesToUpsert){
-  let latest;
-  try{
-    const fresh = await apiGetAll();
-    latest = fresh.entries || [];
-  }catch(e){
-    latest = [...entries]; // couldn't refetch — fall back to local copy rather than fail outright
+/* ============ SAVING TIME ENTRIES ============
+   Each save sends ONLY the entries that changed ("upsertEntries"); the
+   Google Sheet backend (Code.gs version 8) merges them in one at a time
+   under a lock, so two phones saving at the same moment can't erase each
+   other's clock times.
+
+   If a save can't get through (weak signal, backend busy), the change is
+   kept on this device in a "waiting to save" list and retried every 20
+   seconds, when the signal comes back, and when the app is reopened, until
+   it lands. A banner shows how many changes are waiting.
+
+   If the backend hasn't been updated to version 8 yet, it falls back to the
+   older whole-list save, but never uploads a stale local copy: if it can't
+   download the latest list first, the change waits and retries instead. */
+const PENDING_SAVES_KEY = 'vodaPendingEntrySaves';
+const PENDING_DELETES_KEY = 'vodaPendingEntryDeletes';
+let entrySaveQueueBusy = false;
+let backendHasUpsert = null; // null = unknown yet
+function readPending(key){ try{ return JSON.parse(localStorage.getItem(key)||'{}') || {}; }catch(e){ return {}; } }
+function writePending(key, obj){ try{ localStorage.setItem(key, JSON.stringify(obj)); }catch(e){} }
+function pendingCount(){ return Object.keys(readPending(PENDING_SAVES_KEY)).length + Object.keys(readPending(PENDING_DELETES_KEY)).length; }
+function renderPendingSaveBanner(){
+  const el = document.getElementById('pendingSaveBanner');
+  if(!el) return;
+  const n = pendingCount();
+  if(!n){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = `⏳ ${n} change${n===1?'':'s'} waiting to save &mdash; keep the app open; it will save as soon as there's signal. <u>Try now</u>`;
+}
+function queueEntrySaves(list){
+  const q = readPending(PENDING_SAVES_KEY);
+  list.forEach(e=>{ q[e.id] = JSON.parse(JSON.stringify(e)); });
+  writePending(PENDING_SAVES_KEY, q);
+  renderPendingSaveBanner();
+}
+function queueEntryDelete(id){
+  const q = readPending(PENDING_DELETES_KEY); q[id] = nowIso(); writePending(PENDING_DELETES_KEY, q);
+  const s2 = readPending(PENDING_SAVES_KEY); delete s2[id]; writePending(PENDING_SAVES_KEY, s2);
+  renderPendingSaveBanner();
+}
+// Overlay changes still waiting to save on top of fresh server data, so a
+// background refresh never makes an unsaved clock time disappear on screen.
+function overlayPendingEntries(list){
+  const saves = readPending(PENDING_SAVES_KEY), dels = readPending(PENDING_DELETES_KEY);
+  let out = list.filter(e=>!dels[e.id]);
+  Object.values(saves).forEach(p=>{
+    const i = out.findIndex(e=>e.id===p.id);
+    if(i===-1) out.push(p);
+    else if(!out[i].updatedAt || !p.updatedAt || p.updatedAt >= out[i].updatedAt) out[i] = p;
+  });
+  return out;
+}
+async function sendEntryUpserts(list){
+  if(backendHasUpsert !== false){
+    const res = await apiPost('upsertEntries', list);
+    if(res && res.ok){ backendHasUpsert = true; return true; }
+    if(res && res.error === 'Unknown action'){ backendHasUpsert = false; }
+    else throw new Error((res && res.error) || 'Backend rejected the save');
   }
-  entriesToUpsert.forEach(entry=>{
+  // Older backend: whole-list save, but only from a FRESH download
+  const fresh = await apiGetAll(); // throws if it can't download - then we wait and retry
+  const latest = fresh.entries || [];
+  list.forEach(entry=>{
     const idx = latest.findIndex(e=>e.id===entry.id);
     if(idx===-1) latest.push(entry); else latest[idx] = entry;
   });
-  try{
-    const res = await apiPost('saveEntries', latest);
-    if(!res || !res.ok){ showToast('Save failed — backend rejected the update. Make sure the Apps Script was redeployed as a NEW VERSION after the last update.'); return false; }
-    entries = latest;
-    refreshOpenReports();
-    return true;
-  }catch(e){ console.error('save entries failed', e); showToast('Save failed — check your connection'); return false; }
+  const res2 = await apiPost('saveEntries', latest);
+  if(!res2 || !res2.ok) throw new Error('Backend rejected the save');
+  return true;
 }
-// Deletes exactly one entry from the backend the same safe way — fetch
-// fresh, remove just this one by id, save — rather than overwriting with a
-// stale local array that could resurrect something someone else deleted,
-// or erase something someone else added.
-async function deleteEntryMerged(entryId){
-  let latest;
-  try{
-    const fresh = await apiGetAll();
-    latest = fresh.entries || [];
-  }catch(e){
-    latest = [...entries];
+async function sendEntryDeletes(ids){
+  if(backendHasUpsert !== false){
+    const res = await apiPost('deleteEntries', ids);
+    if(res && res.ok){ backendHasUpsert = true; return true; }
+    if(res && res.error === 'Unknown action'){ backendHasUpsert = false; }
+    else throw new Error((res && res.error) || 'Backend rejected the delete');
   }
-  latest = latest.filter(e=>e.id!==entryId);
-  try{
-    const res = await apiPost('saveEntries', latest);
-    if(!res || !res.ok){ showToast('Save failed — backend rejected the update'); return false; }
-    entries = latest;
-    refreshOpenReports();
-    return true;
-  }catch(e){ console.error('delete entry failed', e); showToast('Save failed — check your connection'); return false; }
+  const fresh = await apiGetAll();
+  const latest = (fresh.entries || []).filter(e=>!ids.includes(e.id));
+  const res2 = await apiPost('saveEntries', latest);
+  if(!res2 || !res2.ok) throw new Error('Backend rejected the delete');
+  return true;
 }
+// Try to push everything that's waiting. Safe to call any time.
+async function flushPendingEntrySaves(){
+  if(entrySaveQueueBusy) return;
+  const saves = readPending(PENDING_SAVES_KEY), dels = readPending(PENDING_DELETES_KEY);
+  const saveList = Object.values(saves), delIds = Object.keys(dels);
+  if(!saveList.length && !delIds.length){ renderPendingSaveBanner(); return; }
+  entrySaveQueueBusy = true;
+  try{
+    if(saveList.length){
+      await sendEntryUpserts(saveList);
+      // Only clear what was sent (a newer change made meanwhile stays queued)
+      const now = readPending(PENDING_SAVES_KEY);
+      saveList.forEach(e=>{ if(now[e.id] && now[e.id].updatedAt === e.updatedAt) delete now[e.id]; });
+      writePending(PENDING_SAVES_KEY, now);
+    }
+    if(delIds.length){
+      await sendEntryDeletes(delIds);
+      const now = readPending(PENDING_DELETES_KEY);
+      delIds.forEach(id=>delete now[id]);
+      writePending(PENDING_DELETES_KEY, now);
+    }
+  }catch(e){
+    console.warn('Saving is waiting for signal — will retry', e);
+  }finally{
+    entrySaveQueueBusy = false;
+    renderPendingSaveBanner();
+  }
+}
+async function saveEntriesMerged(entriesToUpsert){
+  // Every saved change is stamped with the time it was made, so the backend
+  // can tell a fresh edit (an admin fix, a clock-out) from an old copy.
+  const stamp = nowIso();
+  entriesToUpsert.forEach(e=>{ if(e !== todayEntry || !e.updatedAt) e.updatedAt = stamp; });
+  // Show the change locally right away
+  entriesToUpsert.forEach(entry=>{
+    const idx = entries.findIndex(e=>e.id===entry.id);
+    if(idx===-1) entries.push(entry); else entries[idx] = entry;
+  });
+  queueEntrySaves(entriesToUpsert);
+  await flushPendingEntrySaves();
+  refreshOpenReports();
+  const stillWaiting = entriesToUpsert.some(e=>readPending(PENDING_SAVES_KEY)[e.id]);
+  if(stillWaiting){
+    showToast('No signal right now — your change is saved on this phone and will upload automatically.');
+    return false;
+  }
+  return true;
+}
+async function deleteEntryMerged(entryId){
+  entries = entries.filter(e=>e.id!==entryId);
+  queueEntryDelete(entryId);
+  await flushPendingEntrySaves();
+  refreshOpenReports();
+  if(readPending(PENDING_DELETES_KEY)[entryId]){
+    showToast('No signal right now — the delete will finish automatically when there is.');
+    return false;
+  }
+  return true;
+}
+// Retry: every 20 seconds, when the signal returns, and when the app reopens
+setInterval(()=>{ if(pendingCount()) flushPendingEntrySaves(); }, 20000);
+window.addEventListener('online', ()=>flushPendingEntrySaves());
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && pendingCount()) flushPendingEntrySaves(); });
 // Back-compat wrapper for any caller that hasn't been updated to specify
 // exactly which entries changed — merges the whole local array in one by
 // one. Prefer saveEntriesMerged([...]) with just the changed entries.
