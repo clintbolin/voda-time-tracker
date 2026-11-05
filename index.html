@@ -423,7 +423,7 @@ main.content{padding:16px 14px 4px;}
       </div>
     </div>
     <div class="signed-in-banner" id="signedInBanner" style="display:none;"></div>
-    <div class="signed-in-banner" id="updateBanner" style="display:none;background:var(--gold);color:#1a1200;cursor:pointer;font-weight:700;" onclick="window.location.reload()">A new version is available — tap to refresh</div>
+    <div class="signed-in-banner" id="updateBanner" style="display:none;background:var(--gold);color:#1a1200;cursor:pointer;font-weight:700;" onclick="hardRefreshApp()">A new version is available — tap to refresh</div>
     <div class="header-meta">
       <div class="header-date" id="headerDate"></div>
       <div class="status-pill" id="statusPill">—</div>
@@ -981,7 +981,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-11-05T13-40";
+const BUILD_ID = "2026-11-05T14-30";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -6124,6 +6124,21 @@ async function removeJobName(name){
 boot();
 </script>
 <script>
+// Tapping the update banner: drop every saved copy of the app and reload it
+// fresh from GitHub, so a device can never get stuck on an old version.
+async function hardRefreshApp(){
+  try{
+    if('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=>r.update().catch(()=>{})));
+    }
+    if(window.caches){
+      const names = await caches.keys();
+      await Promise.all(names.map(n=>caches.delete(n)));
+    }
+  }catch(e){ /* fall through to the reload either way */ }
+  location.replace(location.pathname + '?v=' + Date.now());
+}
 function showUpdateBanner(){
   const el = document.getElementById('updateBanner');
   if(el) el.style.display = 'block';
@@ -6143,7 +6158,7 @@ async function checkForUpdate(){
 }
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').then(reg=>{
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg=>{
       // A new service worker taking over means a new deploy — but rather
       // than yanking the page out from under someone mid-edit, just surface
       // the same banner and let them choose when to refresh.
