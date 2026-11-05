@@ -303,6 +303,11 @@ main.content{padding:16px 14px 4px;}
 .seg-toggle{ display:flex; border:1.5px solid var(--line); border-radius:10px; overflow:hidden; }
 .seg-toggle button{ flex:1; border:none; background:transparent; padding:11px 8px; font-size:14px; font-weight:700; color:var(--muted); font-family:inherit; cursor:pointer; }
 .seg-toggle button.on{ background:var(--gold); color:#1a1200; }
+.side-toggle{ display:inline-flex; align-items:center; }
+.side-toggle button{ border:1.5px solid var(--line); background:transparent; color:var(--muted); font-size:12px; font-weight:700; padding:6px 10px; font-family:inherit; cursor:pointer; }
+.side-toggle button:first-of-type{ border-radius:8px 0 0 8px; }
+.side-toggle button:last-of-type{ border-radius:0 8px 8px 0; border-left:none; }
+.side-toggle button.on{ background:var(--gold); color:#1a1200; border-color:var(--gold); }
 .job-condensed tr.job-subtotal td{ border-bottom:2px solid var(--line); background:var(--gray-bg); }
 /* Phone screens: keep every report column (including Total) visible.
    Tighter cells, and any table still too wide scrolls sideways inside the
@@ -976,7 +981,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-10-19T14-00";
+const BUILD_ID = "2026-11-05T13-40";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -1792,6 +1797,31 @@ async function fetchJobTrackerNames(){
    pattern. This sync does the same round trip: fetch everything fresh,
    touch ONLY the one target job's mitigation.laborCosts array, and post
    straight back — every other job passes through untouched. */
+/* ---- Mitigation or Reconstruction side ----
+   Labor normally goes to a job's Mitigation side in Job Tracker. Some jobs
+   (e.g. a small demo billed with the rebuild) send it to Reconstruction
+   instead. That choice is per job, saved in settings.reconLaborJobIds, and
+   applies to every week's labor for that job going forward. Hours already
+   sent stay where they went. Both sides store labor the same way in Job
+   Tracker (scope.laborCosts), and each counts toward its own job cost. */
+function laborSideFor(jobId){
+  return (Array.isArray(settings.reconLaborJobIds) && settings.reconLaborJobIds.includes(jobId)) ? 'reconstruction' : 'mitigation';
+}
+function laborSideLabel(side){ return side==='reconstruction' ? 'Reconstruction' : 'Mitigation'; }
+async function setLaborSide(jobId, side, jobName){
+  const before = Array.isArray(settings.reconLaborJobIds) ? settings.reconLaborJobIds : [];
+  if(laborSideFor(jobId)===side) return;
+  const next = side==='reconstruction' ? [...new Set([...before, jobId])] : before.filter(x=>x!==jobId);
+  settings.reconLaborJobIds = next;
+  try{
+    const res = await apiPost('saveSettings', settings);
+    if(!res || !res.ok){ settings.reconLaborJobIds = before; showToast('Save failed — backend rejected the update'); renderLaborApproval(); return; }
+  }catch(e){ settings.reconLaborJobIds = before; showToast('Save failed — check your connection'); renderLaborApproval(); return; }
+  logAudit('Job list', todayStr(), [`Labor for "${jobName||jobId}" now goes to the ${laborSideLabel(side)} side in Job Tracker`]);
+  showToast(`${jobName||'This job'}: labor will go to ${laborSideLabel(side)}`);
+  laborFixOpenKey = null;
+  renderLaborApproval();
+}
 async function pushLaborCostToJobTracker(jobId, employeeName, amount, note){
   const res = await fetch(`${JOB_TRACKER_API_URL}?action=getAll`);
   if(!res.ok) throw new Error('Could not reach Job Tracker');
@@ -1799,9 +1829,11 @@ async function pushLaborCostToJobTracker(jobId, employeeName, amount, note){
   const jobs = data.jobs || [];
   const job = jobs.find(j=>j.id===jobId);
   if(!job) throw new Error('That job no longer exists in Job Tracker (may have been archived).');
-  if(!job.scopes || !job.scopes.mitigation) throw new Error('This job has no Mitigation scope in Job Tracker.');
-  if(!Array.isArray(job.scopes.mitigation.laborCosts)) job.scopes.mitigation.laborCosts = [];
-  job.scopes.mitigation.laborCosts.push({ id: uid('TTLC'), amount, date: todayStr(), note });
+  const side = laborSideFor(jobId);
+  const sc = job.scopes && job.scopes[side];
+  if(!sc) throw new Error(`This job has no ${laborSideLabel(side)} section in Job Tracker.`);
+  if(!Array.isArray(sc.laborCosts)) sc.laborCosts = [];
+  sc.laborCosts.push({ id: uid('TTLC'), amount, date: todayStr(), note });
   job.updatedAt = new Date().toISOString();
   const postRes = await fetch(JOB_TRACKER_API_URL, {
     method: 'POST',
@@ -1916,6 +1948,135 @@ function openLaborApproval(){
 }
 function selectLaborWeek(sched, weekStart){
   laborApprovalSelected = { sched, weekStart };
+  laborFixOpenKey = null;
+  refreshJobTrackerJobs(true);
+  renderLaborApproval();
+}
+/* ---- Lines that can't go to Job Tracker, and how to fix them ----
+   Opening a week checks every line against Job Tracker first, so problems
+   show in red BEFORE approving. Each one can be tapped for plain steps to
+   fix it, a button to open Job Tracker, and (when it makes sense) a way to
+   move those hours to a different job right here. */
+const JOB_TRACKER_APP_URL = 'https://clintbolin.github.io/Voda-Tucson-Job-Tracker/';
+let jtJobsCache = { at: 0, jobs: null, loading: false, error: '' };
+let laborFixOpenKey = null;
+async function refreshJobTrackerJobs(force){
+  if(jtJobsCache.loading) return;
+  if(!force && jtJobsCache.jobs && Date.now()-jtJobsCache.at < 60000) return;
+  jtJobsCache.loading = true;
+  try{
+    const res = await fetch(`${JOB_TRACKER_API_URL}?action=getAll`);
+    if(!res.ok) throw new Error('Could not reach Job Tracker');
+    const data = await res.json();
+    jtJobsCache = { at: Date.now(), jobs: data.jobs || [], loading: false, error: '' };
+  }catch(e){
+    jtJobsCache = { at: Date.now(), jobs: jtJobsCache.jobs, loading: false, error: 'Could not check with Job Tracker right now.' };
+  }
+  const la = document.getElementById('modalLaborApproval');
+  if(la && la.classList.contains('active') && !laborApprovalSending) renderLaborApproval();
+}
+// null = fine; otherwise { code, title }
+function laborLineProblem(line){
+  const jobs = jtJobsCache.jobs;
+  if(!jobs) return null;
+  const job = jobs.find(j=>j.id===line.jobId);
+  if(!job) return { code:'missing', title:"This job isn't in Job Tracker anymore" };
+  const side = laborSideFor(line.jobId);
+  if(!job.scopes || !job.scopes[side]){
+    const other = side==='mitigation' ? 'reconstruction' : 'mitigation';
+    return { code:'noside', side, otherExists: !!(job.scopes && job.scopes[other]), title:`This job has no ${laborSideLabel(side)} section in Job Tracker` };
+  }
+  return null;
+}
+function laborLineKey(l){ return `${l.jobId}|${l.name}`; }
+function laborFixHtml(l, prob){
+  const key = laborLineKey(l).replace(/'/g,"\\'");
+  const customer = escapeHtml(l.jobName);
+  const others = allJobNames().filter(n=>n.toLowerCase()!==l.jobName.toLowerCase() && jobTrackerMap[n.toLowerCase()]);
+  const moveBox = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px;">${prob.code==='missing' ? 'Move these hours to the right job' : 'Or, if these hours belong to a different job'}</div>
+      <div style="display:flex;gap:8px;">
+        <select id="laborMoveSel" style="flex:1;padding:9px;border:1.5px solid var(--line);border-radius:8px;font-size:14px;"><option value="">— Pick the correct job —</option>${others.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}</select>
+        <button class="btn btn-ghost" style="width:auto;padding:0 14px;" onclick="moveLaborLine('${key}')">Move</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:5px;">This changes the job on ${escapeHtml(l.name)}'s time entries for this week, then they go out with the rest of the week.</div>
+    </div>`;
+  const sideName = prob.side ? laborSideLabel(prob.side) : '';
+  const otherName = prob.side==='mitigation' ? 'Reconstruction' : 'Mitigation';
+  const otherKey = prob.side==='mitigation' ? 'reconstruction' : 'mitigation';
+  const steps = prob.code==='noside'
+    ? `<div style="font-size:13px;margin-bottom:6px;">This job's labor is set to go to the <b>${sideName}</b> side, but <b>${customer}</b> doesn't have a ${sideName} section in Job Tracker.</div>
+       ${prob.otherExists ? `<div style="font-size:13px;margin-bottom:8px;"><b>Quickest fix:</b> it does have a ${otherName} section, so you can send the labor there instead:</div>
+       <button class="btn btn-gold" style="width:auto;padding:10px 14px;margin-bottom:10px;" onclick="setLaborSide('${l.jobId}','${otherKey}','${customer.replace(/'/g,"\'")}')">Send this job's labor to ${otherName}</button>
+       <div style="font-size:13px;margin-bottom:6px;">Or add the ${sideName} section in Job Tracker:</div>` : ''}
+       <ol style="margin:0 0 0 18px;padding:0;font-size:13px;line-height:1.55;">
+         <li>Tap <b>Open Job Tracker</b> below.</li>
+         <li>Search for <b>${customer}</b> and open the job.</li>
+         <li>Add the <b>${sideName}</b> section (it's fine to leave its amounts at $0 for now) and save.</li>
+         <li>Come back here and tap <b>Check again</b>. The red warning disappears, and the line goes out when you approve.</li>
+       </ol>`
+    : `<div style="font-size:13px;margin-bottom:6px;"><b>${customer}</b> can't be found in Job Tracker. It was most likely deleted, or set up again as a new job (which gives it a new record the Time Tracker doesn't know about).</div>
+       <ol style="margin:0 0 0 18px;padding:0;font-size:13px;line-height:1.55;">
+         <li>Tap <b>Open Job Tracker</b> and look for the customer.</li>
+         <li><b>If you find it</b> (for example set up again under a slightly different name): pick that job in the box below and tap <b>Move</b>.</li>
+         <li><b>If it was deleted on purpose</b> and these hours shouldn't go to any job: tap <b>Don't send these hours</b>. They stay on the timesheet and payroll, they just won't go to Job Tracker.</li>
+       </ol>`;
+  return `<div class="labor-fix" style="margin:6px 0 4px;padding:12px;border:1.5px solid var(--red);border-radius:10px;background:var(--red-bg,rgba(180,35,47,.08));">
+    <div style="font-weight:800;color:var(--red);margin-bottom:6px;">How to fix: ${escapeHtml(prob.title)}</div>
+    ${steps}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+      <a class="btn btn-gold" style="width:auto;padding:10px 14px;text-decoration:none;display:inline-flex;align-items:center;" href="${JOB_TRACKER_APP_URL}" target="_blank" rel="noopener">Open Job Tracker</a>
+      <button class="btn btn-ghost" style="width:auto;padding:10px 14px;" onclick="refreshJobTrackerJobs(true);showToast('Checking with Job Tracker…')">Check again</button>
+      ${prob.code==='missing' ? `<button class="btn btn-ghost" style="width:auto;padding:10px 14px;" onclick="dontSendLaborLine('${key}')">Don't send these hours</button>` : ''}
+    </div>
+    ${moveBox}
+  </div>`;
+}
+function toggleLaborFix(key){
+  laborFixOpenKey = laborFixOpenKey===key ? null : key;
+  renderLaborApproval();
+}
+function currentLaborLine(key){
+  if(!laborApprovalSelected) return null;
+  const w = buildLaborWeek(laborApprovalSelected.sched, laborApprovalSelected.weekStart);
+  return w.lines.find(l=>laborLineKey(l)===key) || null;
+}
+async function updateLaborLineLogs(line, changeFn){
+  const changed = new Map();
+  line.logs.forEach(ref=>{
+    const entry = entries.find(e=>e.id===ref.entryId);
+    const jl = entry && entry.jobLogs.find(j=>j.id===ref.logId);
+    if(!jl) return;
+    changeFn(jl);
+    changed.set(entry.id, entry);
+  });
+  if(changed.size) await saveEntriesMerged([...changed.values()]);
+  return changed.size;
+}
+async function moveLaborLine(key){
+  const line = currentLaborLine(key);
+  const sel = document.getElementById('laborMoveSel');
+  const target = sel ? sel.value : '';
+  if(!line) return;
+  if(!target){ showToast('Pick the correct job first'); return; }
+  const newId = jobTrackerMap[target.toLowerCase()];
+  if(!newId){ showToast('That job isn\'t linked to Job Tracker'); return; }
+  if(!confirm(`Move ${line.name}'s ${fmtDuration(line.ms)} on "${line.jobName}" this week to "${target}"?`)) return;
+  await updateLaborLineLogs(line, jl=>{ jl.jobName = target; jl.jobId = newId; });
+  logAudit(line.name, laborApprovalSelected.weekStart, [`Weekly labor approval: moved ${fmtDuration(line.ms)} from "${line.jobName}" to "${target}"`]);
+  laborFixOpenKey = null;
+  showToast(`Moved to ${target}`);
+  renderLaborApproval();
+}
+async function dontSendLaborLine(key){
+  const line = currentLaborLine(key);
+  if(!line) return;
+  if(!confirm(`Keep ${line.name}'s ${fmtDuration(line.ms)} on "${line.jobName}" on the timesheet only, and never send it to Job Tracker?`)) return;
+  // Unlinking from Job Tracker keeps the hours on timesheets and payroll
+  await updateLaborLineLogs(line, jl=>{ jl.jobId = null; jl.notSentReason = 'Job no longer in Job Tracker'; });
+  logAudit(line.name, laborApprovalSelected.weekStart, [`Weekly labor approval: ${fmtDuration(line.ms)} on "${line.jobName}" marked "don't send" (job no longer in Job Tracker)`]);
+  laborFixOpenKey = null;
+  showToast('Those hours will stay on the timesheet only');
   renderLaborApproval();
 }
 function renderLaborApproval(){
@@ -1954,16 +2115,33 @@ function renderLaborApproval(){
     return `<tr><td>${escapeHtml(n)}</td><td>${fmtDuration(t.ms)}</td><td>${ot>0 ? fmtDuration(ot*3600000) : '\u2014'}</td><td>${fix}</td></tr>`;
   }).join('');
   let jobsHtml = '';
-  let lastJob = null, grand = 0;
+  let lastJob = null, grand = 0, problemCount = 0;
   w.lines.forEach(l=>{
     if(l.jobName!==lastJob){
       if(lastJob!==null) jobsHtml += `</tbody></table>`;
-      jobsHtml += `<div class="card-eyebrow" style="margin-top:12px;">${escapeHtml(l.jobName)}</div>
+      const side = laborSideFor(l.jobId);
+      const jn = escapeHtml(l.jobName).replace(/'/g,"\\'");
+      jobsHtml += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:14px;flex-wrap:wrap;">
+        <div class="card-eyebrow" style="margin:0;">${escapeHtml(l.jobName)}</div>
+        <div class="side-toggle" title="Which side of this job the labor goes to in Job Tracker">
+          <span style="font-size:11px;color:var(--muted);font-weight:700;margin-right:4px;">Send to</span>
+          <button class="${side==='mitigation'?'on':''}" onclick="setLaborSide('${l.jobId}','mitigation','${jn}')">Mitigation</button><button class="${side==='reconstruction'?'on':''}" onclick="setLaborSide('${l.jobId}','reconstruction','${jn}')">Reconstruction</button>
+        </div>
+      </div>
         <table class="report-table"><thead><tr><th>Employee</th><th>Hours this week</th><th>To send</th></tr></thead><tbody>`;
       lastJob = l.jobName;
     }
     grand += l.amount;
-    jobsHtml += `<tr><td>${escapeHtml(l.name)}</td><td>${fmtDuration(l.ms)}</td><td>$${l.amount.toFixed(2)}${l.hadPrior ? ' <span style="color:var(--muted);">(adjustment)</span>' : ''}</td></tr>`;
+    const prob = laborLineProblem(l);
+    const lkey = laborLineKey(l);
+    if(prob) problemCount++;
+    jobsHtml += `<tr${prob?' style="background:var(--red-bg,rgba(180,35,47,.08));"':''}><td>${escapeHtml(l.name)}</td><td>${fmtDuration(l.ms)}</td><td>$${l.amount.toFixed(2)}${l.hadPrior ? ' <span style="color:var(--muted);">(adjustment)</span>' : ''}</td></tr>`;
+    if(prob){
+      jobsHtml += `<tr><td colspan="3" style="padding:4px 0 8px;border-bottom:none;">
+        <button class="btn" style="width:100%;justify-content:flex-start;background:transparent;border:1.5px dashed var(--red);color:var(--red);font-weight:800;padding:10px 12px;" onclick="toggleLaborFix('${lkey.replace(/'/g,"\\'")}')">⚠ Can't send: ${escapeHtml(prob.title)} &mdash; ${laborFixOpenKey===lkey?'hide':'tap to fix'}</button>
+        ${laborFixOpenKey===lkey ? laborFixHtml(l, prob) : ''}
+      </td></tr>`;
+    }
   });
   if(lastJob!==null) jobsHtml += `</tbody></table>`;
   const blocked = w.flagged.length > 0;
@@ -1975,7 +2153,10 @@ function renderLaborApproval(){
     <div class="card-eyebrow" style="margin-top:16px;">Going to Job Tracker (one line per employee per job)</div>
     ${jobsHtml || '<div class="empty">Nothing to send for this week.</div>'}
     <div class="hint" style="margin-top:12px;font-weight:700;color:var(--ink);">Total to send: $${grand.toFixed(2)}</div>
-    <div class="hint">Shop time, meetings, and anything not tied to a Job Tracker job is counted in the totals above but isn't sent to a job. Employees with no hourly rate set send $0.</div>
+    ${jtJobsCache.loading && !jtJobsCache.jobs ? '<div class="hint">Checking each job with Job Tracker…</div>' : ''}
+    ${jtJobsCache.error ? `<div class="hint">${jtJobsCache.error}</div>` : ''}
+    ${problemCount ? `<div class="hint" style="color:var(--red);font-weight:700;">⚠ ${problemCount} line${problemCount===1?'':'s'} can't go to Job Tracker yet &mdash; tap the red line${problemCount===1?'':'s'} above for how to fix. You can still approve now: everything else is sent, and these stay here until fixed.</div>` : ''}
+    <div class="hint">Each job's labor goes to its <b>Mitigation</b> side unless you switch it to <b>Reconstruction</b> (for example when a small demo is billed with the rebuild). The choice is remembered for that job. Shop time, meetings, and anything not tied to a Job Tracker job is counted in the totals above but isn't sent to a job. Employees with no hourly rate set send $0.</div>
     ${blocked
       ? `<div class="hint" style="color:var(--red);font-weight:700;">\u26a0 ${w.flagged.map(escapeHtml).join(', ')} ${w.flagged.length===1?'has':'have'} a missing or impossible clock time this week. Fix ${w.flagged.length===1?'it':'them'} above before approving \u2014 otherwise those hours would be left out.</div>
          <button class="btn btn-ghost" disabled style="opacity:.55;">Approve &amp; send to Job Tracker</button>`
@@ -1992,10 +2173,12 @@ async function pushLaborBatchToJobTracker(lines){
   lines.forEach(l=>{
     const job = jobs.find(j=>j.id===l.jobId);
     if(!job){ skipped.push({ line:l, reason:'job no longer in Job Tracker' }); return; }
-    if(!job.scopes || !job.scopes.mitigation){ skipped.push({ line:l, reason:'job has no Mitigation scope' }); return; }
+    const side = laborSideFor(l.jobId);
+    const sc = job.scopes && job.scopes[side];
+    if(!sc){ skipped.push({ line:l, reason:`job has no ${laborSideLabel(side)} section` }); return; }
     if(Math.abs(l.amount) >= 0.01){
-      if(!Array.isArray(job.scopes.mitigation.laborCosts)) job.scopes.mitigation.laborCosts = [];
-      job.scopes.mitigation.laborCosts.push({ id: uid('TTLC'), amount: l.amount, date: l.date, note: l.note });
+      if(!Array.isArray(sc.laborCosts)) sc.laborCosts = [];
+      sc.laborCosts.push({ id: uid('TTLC'), amount: l.amount, date: l.date, note: l.note });
       job.updatedAt = new Date().toISOString();
     }
     sent.push(l);
@@ -2050,11 +2233,13 @@ async function approveLaborWeek(sched, weekStart){
     logAudit('Weekly labor approval', w.weekStart, [`Approved and sent ${sent.length} line(s), $${sent.reduce((s,l)=>s+l.amount,0).toFixed(2)}, for the ${sched==='weekly'?'Weekly':'Bi-Weekly'} crew, ${range}`]);
     laborApprovalSending = false;
     if(skipped.length){
-      alert(`Sent ${sent.length} line(s). ${skipped.length} couldn't be sent:\n\n` + skipped.map(x=>`\u2022 ${x.line.jobName} (${x.line.name}): ${x.reason}`).join('\n') + `\n\nThose stay on the list until the job is fixed in Job Tracker.`);
+      // Stay on this week so the lines that need fixing are right there, in red
+      showToast(`Sent ${sent.length} line${sent.length===1?'':'s'}. ${skipped.length} need${skipped.length===1?'s':''} fixing — tap the red line${skipped.length===1?'':'s'}.`);
+      await refreshJobTrackerJobs(true);
     } else {
       showToast(`Sent to Job Tracker \u2014 $${total.toFixed(2)}`);
+      laborApprovalSelected = null;
     }
-    laborApprovalSelected = null;
     renderLaborApproval();
     checkLaborApprovalPrompt(false);
   }catch(err){
