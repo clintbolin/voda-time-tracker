@@ -982,7 +982,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-11-05T15-30";
+const BUILD_ID = "2026-11-09T16-45";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -1035,6 +1035,18 @@ const DEFAULT_VEHICLES = ["ProMaster #1","ProMaster #2","ProMaster #3","Other / 
 // Job Tracker's own backend — used to pull real job/customer names so
 // techs pick from the same list Job Tracker uses. Falls back silently to
 // the manually managed job list below if this can't be reached.
+// Job Tracker's Google script requires this key on every call (added when
+// Job Tracker got tech PINs). GET: &key=... on the URL. POST: "key" in the
+// JSON body next to "action". No user or PIN is sent.
+const JOB_TRACKER_KEY = 'tt-YQPLvZgeV8q3_PMMGr2G0Pw4';
+const JOB_TRACKER_GETALL_URL = () => `${JOB_TRACKER_API_URL}?action=getAll&key=${encodeURIComponent(JOB_TRACKER_KEY)}`;
+// Job Tracker answers {error:...} instead of a job list if it rejects a
+// call. Never treat that as "no jobs" - the saves below upload the whole
+// job list back, so an empty list could wipe Job Tracker.
+function jobTrackerJobsOrThrow(data){
+  if(!data || data.error || !Array.isArray(data.jobs)) throw new Error('Job Tracker refused the request' + (data && data.error ? ` (${data.error})` : ''));
+  return data.jobs;
+}
 const JOB_TRACKER_API_URL = "https://script.google.com/macros/s/AKfycbxIOIYM6L4MNXAJF79axSqgCcrl2UTcNnuMKOf27C5aXphlNExTOIfQIGpbU6B-kpDt9A/exec";
 
 /* ============ STATE ============ */
@@ -1748,9 +1760,10 @@ function calendarJobStatus(job){
 }
 async function fetchJobTrackerNames(){
   try{
-    const res = await fetch(`${JOB_TRACKER_API_URL}?action=getAll`);
+    const res = await fetch(JOB_TRACKER_GETALL_URL());
     if(!res.ok) return;
     const data = await res.json();
+    if(!data || data.error || !Array.isArray(data.jobs)){ console.warn('Job Tracker refused the job list request', data && data.error); return; } // keep the current list
     // Only jobs that have actually landed (won) — Pipeline/Lost jobs would
     // just clutter the dropdown with places nobody should be driving to yet.
     // Also drop off automatically 90 days after landing, so the list doesn't
@@ -1825,10 +1838,10 @@ async function setLaborSide(jobId, side, jobName){
   renderLaborApproval();
 }
 async function pushLaborCostToJobTracker(jobId, employeeName, amount, note){
-  const res = await fetch(`${JOB_TRACKER_API_URL}?action=getAll`);
+  const res = await fetch(JOB_TRACKER_GETALL_URL());
   if(!res.ok) throw new Error('Could not reach Job Tracker');
   const data = await res.json();
-  const jobs = data.jobs || [];
+  const jobs = jobTrackerJobsOrThrow(data);
   const job = jobs.find(j=>j.id===jobId);
   if(!job) throw new Error('That job no longer exists in Job Tracker (may have been archived).');
   const side = laborSideFor(jobId);
@@ -1840,7 +1853,7 @@ async function pushLaborCostToJobTracker(jobId, employeeName, amount, note){
   const postRes = await fetch(JOB_TRACKER_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: 'saveJobs', data: jobs })
+    body: JSON.stringify({ action: 'saveJobs', key: JOB_TRACKER_KEY, data: jobs })
   });
   if(!postRes.ok) throw new Error('Job Tracker rejected the update');
   const postData = await postRes.json().catch(()=>({}));
@@ -1967,10 +1980,10 @@ async function refreshJobTrackerJobs(force){
   if(!force && jtJobsCache.jobs && Date.now()-jtJobsCache.at < 60000) return;
   jtJobsCache.loading = true;
   try{
-    const res = await fetch(`${JOB_TRACKER_API_URL}?action=getAll`);
+    const res = await fetch(JOB_TRACKER_GETALL_URL());
     if(!res.ok) throw new Error('Could not reach Job Tracker');
     const data = await res.json();
-    jtJobsCache = { at: Date.now(), jobs: data.jobs || [], loading: false, error: '' };
+    jtJobsCache = { at: Date.now(), jobs: jobTrackerJobsOrThrow(data), loading: false, error: '' };
   }catch(e){
     jtJobsCache = { at: Date.now(), jobs: jtJobsCache.jobs, loading: false, error: 'Could not check with Job Tracker right now.' };
   }
@@ -2167,10 +2180,10 @@ function renderLaborApproval(){
 // One round trip to Job Tracker for the whole week: fetch every job once,
 // add all the week's lines, save once. Returns which lines made it.
 async function pushLaborBatchToJobTracker(lines){
-  const res = await fetch(`${JOB_TRACKER_API_URL}?action=getAll`);
+  const res = await fetch(JOB_TRACKER_GETALL_URL());
   if(!res.ok) throw new Error('Could not reach Job Tracker');
   const data = await res.json();
-  const jobs = data.jobs || [];
+  const jobs = jobTrackerJobsOrThrow(data);
   const sent = [], skipped = [];
   lines.forEach(l=>{
     const job = jobs.find(j=>j.id===l.jobId);
@@ -2189,7 +2202,7 @@ async function pushLaborBatchToJobTracker(lines){
     const postRes = await fetch(JOB_TRACKER_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'saveJobs', data: jobs })
+      body: JSON.stringify({ action: 'saveJobs', key: JOB_TRACKER_KEY, data: jobs })
     });
     if(!postRes.ok) throw new Error('Job Tracker rejected the update');
     const postData = await postRes.json().catch(()=>({}));
