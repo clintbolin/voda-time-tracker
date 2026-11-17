@@ -300,6 +300,8 @@ main.content{padding:16px 14px 4px;}
 .report-letterhead .rl-date{font-size:11px;color:var(--muted);margin-top:2px;}
 
 .drying-table th, .drying-table td{ font-size:12px; }
+.excel-btn{ border:1.5px solid #1D6F42; color:#1D6F42; background:transparent; font-size:12px; font-weight:800; padding:5px 10px; border-radius:8px; cursor:pointer; font-family:inherit; }
+[data-theme="dark"] .excel-btn{ border-color:#4CAF7A; color:#4CAF7A; }
 .seg-toggle{ display:flex; border:1.5px solid var(--line); border-radius:10px; overflow:hidden; }
 .seg-toggle button{ flex:1; border:none; background:transparent; padding:11px 8px; font-size:14px; font-weight:700; color:var(--muted); font-family:inherit; cursor:pointer; }
 .seg-toggle button.on{ background:var(--gold); color:#1a1200; }
@@ -510,7 +512,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-head">
     <div><div class="sheet-title">Weekly labor approval</div><div class="sheet-sub">Review last week's hours, then send them to Job Tracker</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button type="button" class="excel-btn" onclick="exportActiveModalToExcel()" title="Download as an Excel file">Excel</button><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalLaborApproval')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
@@ -670,7 +672,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-head">
     <div><div class="sheet-title">Daily hours</div><div class="sheet-sub">One day, every employee</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button type="button" class="excel-btn" onclick="exportActiveModalToExcel()" title="Download as an Excel file">Excel</button><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalDailyReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
@@ -684,7 +686,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-head">
     <div><div class="sheet-title">Weekly hours</div><div class="sheet-sub">One week, by pay schedule</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button type="button" class="excel-btn" onclick="exportActiveModalToExcel()" title="Download as an Excel file">Excel</button><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalWeeklyReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
@@ -705,7 +707,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-head">
     <div><div class="sheet-title">Payroll report</div><div class="sheet-sub">Each employee's hours, regular time &amp; overtime</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button type="button" class="excel-btn" onclick="exportActiveModalToExcel()" title="Download as an Excel file">Excel</button><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalPayrollReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
@@ -725,7 +727,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-head">
     <div><div class="sheet-title">Employee report</div><div class="sheet-sub">Jobs worked, hours, and payroll breakdown</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button type="button" class="excel-btn" onclick="exportActiveModalToExcel()" title="Download as an Excel file">Excel</button><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalEmployeeReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
@@ -746,7 +748,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-head">
     <div><div class="sheet-title">Job report</div><div class="sheet-sub">Who worked each job &mdash; full detail or condensed totals</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button type="button" class="excel-btn" onclick="exportActiveModalToExcel()" title="Download as an Excel file">Excel</button><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalJobReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
@@ -773,7 +775,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-head">
     <div><div class="sheet-title">Detailed labor report</div><div class="sheet-sub">Employee, jobs, hours &amp; cost — per day</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button type="button" class="excel-btn" onclick="exportActiveModalToExcel()" title="Download as an Excel file">Excel</button><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalDetailedLabor')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
@@ -790,7 +792,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-head">
     <div><div class="sheet-title">Edit history</div><div class="sheet-sub">Every change made through Adjust Time Entries</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button type="button" class="excel-btn" onclick="exportActiveModalToExcel()" title="Download as an Excel file">Excel</button><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalAuditLog')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
@@ -807,7 +809,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-head">
     <div><div class="sheet-title">Shift times needing review</div><div class="sheet-sub">A missing clock-out, or a clock-in/out that doesn't add up</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button type="button" class="excel-btn" onclick="exportActiveModalToExcel()" title="Download as an Excel file">Excel</button><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalStaleShifts')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
@@ -820,7 +822,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-head">
     <div><div class="sheet-title">Employee sign-offs</div><div class="sheet-sub">Who has certified their hours, and when</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button type="button" class="excel-btn" onclick="exportActiveModalToExcel()" title="Download as an Excel file">Excel</button><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalSignoffsReport')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
@@ -833,7 +835,7 @@ main.content{padding:16px 14px 4px;}
   <div class="sheet-head">
     <div><div class="sheet-title">Labor sync log</div><div class="sheet-sub">Every session sent to Job Tracker — hours &amp; dollars together</div></div>
     <div style="display:flex;align-items:center;gap:13px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button type="button" class="excel-btn" onclick="exportActiveModalToExcel()" title="Download as an Excel file">Excel</button><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" onclick="printActiveModal()" style="cursor:pointer;" title="Print"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <button class="close-x" onclick="closeModalBack('modalLaborSyncLog')"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
   </div>
@@ -982,7 +984,7 @@ const BACKEND_READY = CONFIG.API_URL && CONFIG.API_URL.indexOf('REPLACE_WITH') !
 // update-check below fetches the live index.html and compares this value to
 // notice a new deploy even on a device that's had the app open all day and
 // hasn't reloaded on its own. See project log, 2026-09-22.
-const BUILD_ID = "2026-11-09T16-45";
+const BUILD_ID = "2026-11-17T15-20";
 
 /* ============ DARK MODE ============ */
 const DARK_MODE_KEY = 'vodaTimeTrackerDarkMode';
@@ -2888,6 +2890,144 @@ function printReportContent(contentNode, filtersHtml){
   // Must run in the same tap as the Print button — any delay and iPhone
   // Safari treats it as an unwanted automatic print and blocks it.
   window.print();
+}
+/* ============ EXCEL DOWNLOAD ============
+   The "Excel" button on each report turns what's on screen into a real
+   .xlsx spreadsheet: report title, date/time and the filters used at the
+   top, then each section heading and table in the same order as the
+   report. Numbers come through as numbers ("9.25 hrs" -> 9.25,
+   "$151.28" -> 151.28) so they can be added up in Excel; table headings
+   and the title are bold.
+   The .xlsx file is built right here in the app (no add-on to download),
+   so the button works even without signal. */
+function excelText(el){
+  if(el.nodeType === 3) return el.textContent;
+  if(el.nodeType !== 1) return '';
+  if(el.tagName === 'BR') return ' ';
+  return Array.from(el.childNodes).map(excelText).join(' ');
+}
+function excelCellValue(raw){
+  const t = String(raw||'').replace(/\s+/g,' ').trim();
+  if(!t || t === '—' || t === '-' || t === '–') return '';
+  const m = t.match(/^(-?)\$?\s?([\d,]+(?:\.\d+)?)\s*(hrs?|%)?$/i);
+  if(m){
+    const n = parseFloat(m[2].replace(/,/g,''));
+    if(!isNaN(n)) return m[1] ? -n : n;
+  }
+  return t;
+}
+// Rows are arrays of cells; a cell is a value, or {v, bold:true}
+function excelRowsFromReport(container){
+  const rows = [];
+  const walk = (el)=>{
+    if(el.nodeType !== 1) return;
+    if(el.tagName === 'TABLE'){
+      el.querySelectorAll('tr').forEach(tr=>{
+        const row = [];
+        tr.querySelectorAll('th,td').forEach(cell=>{
+          const v = excelCellValue(excelText(cell));
+          row.push(cell.tagName === 'TH' ? { v, bold:true } : v);
+          const span = parseInt(cell.getAttribute('colspan')||'1');
+          for(let i=1;i<span;i++) row.push('');
+        });
+        if(row.some(c=>(c && typeof c==='object' ? c.v : c) !== '')) rows.push(row);
+      });
+      rows.push([]);
+      return;
+    }
+    if(!el.querySelector('table')){
+      const t = excelText(el).replace(/\s+/g,' ').trim();
+      if(t) rows.push([{ v:t, bold:true }]);
+      return;
+    }
+    Array.from(el.children).forEach(walk);
+  };
+  Array.from(container.children).forEach(walk);
+  return rows;
+}
+/* ---- Minimal .xlsx writer (a zip of a few XML files) ---- */
+const CRC_TABLE = (()=>{ const t = new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = (c&1) ? (0xEDB88320 ^ (c>>>1)) : (c>>>1); t[n]=c>>>0; } return t; })();
+function crc32(bytes){ let c = 0xFFFFFFFF; for(let i=0;i<bytes.length;i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function zipStore(files){ // files: [{name, data:Uint8Array}] -> Blob (stored, no compression)
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0;
+  const u16 = n=>[n & 0xFF, (n>>>8) & 0xFF];
+  const u32 = n=>[n & 0xFF, (n>>>8) & 0xFF, (n>>>16) & 0xFF, (n>>>24) & 0xFF];
+  files.forEach(f=>{
+    const name = enc.encode(f.name), crc = crc32(f.data), size = f.data.length;
+    const local = new Uint8Array([0x50,0x4B,0x03,0x04, ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(size), ...u32(size), ...u16(name.length), ...u16(0)]);
+    parts.push(local, name, f.data);
+    central.push(new Uint8Array([0x50,0x4B,0x01,0x02, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(size), ...u32(size), ...u16(name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset)]), name);
+    offset += local.length + name.length + size;
+  });
+  const cdSize = central.reduce((s,a)=>s+a.length,0);
+  const end = new Uint8Array([0x50,0x4B,0x05,0x06, ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(cdSize), ...u32(offset), ...u16(0)]);
+  return new Blob([...parts, ...central, end], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+function xmlEsc(v){ return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,''); }
+function colName(i){ let s=''; i++; while(i>0){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26); } return s; }
+function buildXlsx(rows, sheetName){
+  const widths = [];
+  const sheetRows = rows.map((r,ri)=>{
+    const cells = r.map((c,ci)=>{
+      const cell = (c && typeof c==='object') ? c : { v:c };
+      if(cell.v === '' || cell.v == null) return '';
+      // Size columns from table rows only (one-cell heading lines can run long)
+      if(ri >= 5 && r.length > 1) widths[ci] = Math.min(40, Math.max(widths[ci]||8, String(cell.v).length + 2));
+      const ref = colName(ci) + (ri+1);
+      const st = cell.bold ? ' s="1"' : '';
+      return typeof cell.v === 'number'
+        ? `<c r="${ref}"${st}><v>${cell.v}</v></c>`
+        : `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(cell.v)}</t></is></c>`;
+    }).join('');
+    return `<row r="${ri+1}">${cells}</row>`;
+  }).join('');
+  const cols = widths.length ? `<cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w||8}" customWidth="1"/>`).join('')}</cols>` : '';
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${cols}<sheetData>${sheetRows}</sheetData></worksheet>`;
+  const enc = new TextEncoder();
+  const f = (name, xml)=>({ name, data: enc.encode(xml) });
+  return zipStore([
+    f('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'),
+    f('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'),
+    f('xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xmlEsc(sheetName)}" sheetId="1" r:id="rId1"/></sheets></workbook>`),
+    f('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'),
+    f('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'),
+    f('xl/worksheets/sheet1.xml', sheetXml)
+  ]);
+}
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 30000);
+}
+function exportActiveModalToExcel(){
+  const open = [...document.querySelectorAll('.overlay.active')];
+  const overlay = open[open.length-1];
+  if(!overlay) return;
+  const sheet = overlay.querySelector('.sheet');
+  const filtersText = collectReportFilters(sheet).replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&middot;/g,'·').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
+  const clone = sheet.cloneNode(true);
+  const lh = clone.querySelector('.report-letterhead');
+  const titleEl = lh && lh.querySelector('.rl-title');
+  const title = (titleEl ? excelText(titleEl) : excelText(sheet.querySelector('.sheet-title')||document.createElement('div'))).replace(/\s+/g,' ').trim() || 'Report';
+  clone.querySelectorAll('.report-letterhead, button, input, select, textarea, datalist, .field, .sheet-head, .sheet-handle, svg, .labor-fix, script, style').forEach(n=>n.remove());
+  const generated = new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+  const content = excelRowsFromReport(clone);
+  if(!content.some(r=>r.length > 1)){ showToast('Nothing to export yet — pick the report options first'); return; }
+  const rows = [
+    [{ v:'Voda Cleaning & Restoration of Tucson', bold:true }],
+    [{ v:title, bold:true }],
+    [`Generated ${generated}`],
+    [filtersText || ''],
+    [],
+    ...content
+  ];
+  const safe = title.replace(/[\\/:*?"<>|]+/g,'').replace(/\s+/g,' ').trim().slice(0,90);
+  downloadBlob(buildXlsx(rows, 'Report'), `Voda - ${safe} - ${todayStr()}.xlsx`);
+  showToast('Excel file downloaded');
 }
 function printActiveModal(){
   const open = [...document.querySelectorAll('.overlay.active')];
